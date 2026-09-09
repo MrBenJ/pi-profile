@@ -60,7 +60,8 @@ The launcher preserves:
 - Pi's `settings.sessionDir` precedence;
 - trusted `.pi` and `.agents` project resources;
 - intentionally shared `~/.agents/skills`;
-- `HOME`, `USERPROFILE`, cloud configuration directories, and ordinary development variables.
+- `HOME`, `USERPROFILE`, cloud configuration directories, and ordinary development variables;
+- `PI_PACKAGE_DIR`, which Pi 0.85.1 uses for its own executable package root (metadata, bundled themes/assets, and package-manager behavior for Nix/Guix), not for user-installed resources under `PI_CODING_AGENT_DIR`.
 
 Consequently, explicit native paths can cross profile roots. Cloud SDKs may also authenticate through default files, metadata services, helpers, or other mechanisms even when known credential environment variables are removed. `pi-profile` does not redirect or disable those chains.
 

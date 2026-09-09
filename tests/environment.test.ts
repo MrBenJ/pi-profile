@@ -28,6 +28,12 @@ test("preserves ordinary and native explicit session environment while replacing
   expect(env.PI_CODING_AGENT_SESSION_DIR).toBe("/personal/sessions");
 });
 
+test("preserves PI_PACKAGE_DIR as Pi runtime-code location rather than profile user data", () => {
+  const env = buildEnvironment(work, { PI_PACKAGE_DIR: "/nix/store/pi-coding-agent", PI_CODING_AGENT_DIR: "/personal" });
+  expect(env.PI_PACKAGE_DIR).toBe("/nix/store/pi-coding-agent");
+  expect(env.PI_CODING_AGENT_DIR).toBe(work.root);
+});
+
 test("retains allowlisted names without storing values", () => {
   const profile = { ...work, metadata: { ...work.metadata, inheritEnvironment: ["AWS_PROFILE"] } };
   expect(buildEnvironment(profile, { AWS_PROFILE: "synthetic-work", AWS_SECRET_ACCESS_KEY: "fixture" })).toMatchObject({ AWS_PROFILE: "synthetic-work" });

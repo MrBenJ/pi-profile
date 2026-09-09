@@ -103,6 +103,13 @@ The orchestrator supplied a new full-branch review; this worker did not delegate
 
 These fixes await the orchestrator’s fresh read-only review; no clean independent verdict is claimed here.
 
+## Pi package-directory environment boundary
+
+- Verified against installed Pi `0.85.1` documentation and source before changing policy.
+- `docs/environment-variables.md` defines `PI_PACKAGE_DIR` as a package-directory override for Nix/Guix store paths.
+- `dist/config.js` consumes it in `getPackageDir()` and derives Pi's package metadata, bundled theme/export/assets, docs, and package-manager paths from that root.
+- Profile-installed user resources remain rooted through `PI_CODING_AGENT_DIR`; therefore `pi-profile` intentionally preserves `PI_PACKAGE_DIR` while overwriting only `PI_CODING_AGENT_DIR` and `PI_PROFILE_NAME`. `tests/environment.test.ts` locks this distinction.
+
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
