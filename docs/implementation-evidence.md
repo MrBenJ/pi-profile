@@ -112,6 +112,16 @@ These fixes await the orchestrator’s fresh read-only review; no clean independ
 - A separate no-emit TypeScript project now checks source, tests, and Vitest configuration during `verify`.
 - Calling `setChild()` after release now reports `LEASE_RELEASED` before PID validation.
 
+## Round-three minor-edge hardening
+
+The full-branch review reported no blocking issues and confirmed lease safety, parsing, cleanup, and discovery. Remaining minor edges were closed with regressions:
+
+- POSIX foreground pgid/tpgid evidence is authoritative even when stdin, stdout, and stderr are all redirected; attached-TTY detection is now only the fallback when group evidence is unavailable.
+- Vitest compiles `dist` once in global setup before file workers start; E2E and native-Pi files no longer race two `tsc` processes against the same output tree.
+- Bare `--export` follows Pi's actual parser as an unknown session flag and receives the profile indicator; `--export <file>` remains a native management exit.
+- Retained lease diagnostics use the owner-provided authoritative path, and the lease directory constant is exported rather than duplicated by lifecycle code.
+- Import's repeated tree walks remain intentional: user-facing inspection, pre-copy revalidation, and per-entry before/after checks protect different mutation windows.
+
 ## Pi package-directory environment boundary
 
 - Verified against installed Pi `0.85.1` documentation and source before changing policy.
@@ -122,7 +132,7 @@ These fixes await the orchestrator’s fresh read-only review; no clean independ
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
-- `npm run verify`: PASS — 15 test files, 232 tests; production and test-suite TypeScript no-emit checks, tests, and compiled build passed.
+- `npm run verify`: PASS — 15 test files, 235 tests; production and test-suite TypeScript no-emit checks, tests, and compiled build passed.
 - `npm pack --dry-run`: PASS — package contained only declared runtime/docs files.
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
@@ -130,7 +140,7 @@ These fixes await the orchestrator’s fresh read-only review; no clean independ
 - **Partially retracted round-three smoke:** package/tarball/install/diff checks passed, but `--export=<file>` and prepended-`--offline` help checks did not establish the claimed parser/dispatch behavior. Replacement native parser, argv-zero subcommand, and non-help checks are recorded above.
 - Post-acceptance final smoke: PASS — built-launcher argv-zero auth/uninstall help with subcommand-unique assertions; offline credential-free auth non-help JSON; direct native `parseArgs` supported/equals export semantics; fresh pack; tarball exclusion scan; isolated install/profile creation; and clean diff/status.
 - Post-discovery-fix macOS smoke: PASS — repeated native subcommand help, credential-free auth non-help behavior, direct parser semantics, fresh pack/exclusions, isolated install/profile creation, and clean diff/status after all code commits.
-- Post-hardening macOS package smoke: PASS — fresh prepack/build, tarball exclusion scan, isolated tarball install, packed version, profile creation, and listing. Native Pi parser, argv-zero help, and credential-free auth checks passed as part of the 232-test verification run.
+- Post-hardening macOS package smoke: PASS — fresh prepack/build, tarball exclusion scan, isolated tarball install, packed version, profile creation, and listing. Native Pi parser, argv-zero help, credential-free auth, bare/valued export, and serialized-build checks passed as part of the 235-test verification run.
 - `git diff --check`: PASS.
 
 ## Not verified in this environment
