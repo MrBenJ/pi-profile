@@ -1,9 +1,9 @@
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { buildEnvironment } from "../src/environment.js";
-import { inspectLeases } from "../src/lease.js";
+import { acquireLease, inspectLeases } from "../src/lease.js";
 import { runPi, resolvePi } from "../src/process.js";
 import { ProfileStore } from "../src/profile-store.js";
 import type { LaunchRequest, Profile } from "../src/contracts.js";
@@ -75,6 +75,18 @@ test("SIGINT waits for a synthetic child and releases its lease", async () => {
   expect((await inspectLeases(profile)).active).toHaveLength(0);
 });
 
+test("drains a child after lease publication failure and retains the conservative lease", async () => {
+  let retained: Awaited<ReturnType<typeof acquireLease>> | undefined;
+  const leaseFactory = async (selected: Profile) => {
+    const lease = await acquireLease(selected);
+    retained = lease;
+    return { ...lease, setChild: async () => { throw new Error("injected publication failure"); } };
+  };
+  await expect(runPi(request([], { TEST_WAIT_FOR_SIGNAL: "1" }), executable, { leaseFactory })).rejects.toThrow(/lease.*recorded/i);
+  expect((await inspectLeases(profile)).active).toHaveLength(1);
+  await retained?.release();
+});
+
 test("reports spawn failures and releases its lease", async () => {
   await expect(runPi(request([]), { command: join(fixture, "missing-pi"), prefixArgs: [] })).rejects.toThrow(/start Pi/i);
   expect((await inspectLeases(profile)).active).toHaveLength(0);
@@ -88,6 +100,20 @@ test("supports concurrent same-profile launches with distinct leases", async () 
 });
 
 describe("Pi resolution", () => {
+  test.each([
+    ["global", (pathDirectory: string) => join(pathDirectory, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")],
+    ["local", (pathDirectory: string) => join(pathDirectory, "..", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")],
+  ] as const)("resolves a %s Windows npm shim without a shell", async (_layout, bundlePath) => {
+    const pathDirectory = join(fixture, "node_modules", ".bin");
+    const shim = join(pathDirectory, "pi.cmd");
+    const bundle = bundlePath(pathDirectory);
+    await mkdir(pathDirectory, { recursive: true });
+    await mkdir(join(bundle, ".."), { recursive: true });
+    await writeFile(shim, "@echo off\r\n");
+    await writeFile(bundle, "// synthetic Pi entrypoint\n");
+    await expect(resolvePi({ Path: pathDirectory }, "win32")).resolves.toEqual({ command: process.execPath, prefixArgs: [bundle] });
+  });
+
   test("finds an executable from PATH without a shell", async () => {
     const resolved = await resolvePi(process.env, process.platform);
     expect(resolved.command).toBeTruthy();

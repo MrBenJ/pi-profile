@@ -39,8 +39,15 @@ export async function resolvePi(
       if (await executable(direct, platform)) return { command: direct, prefixArgs: [] };
       const commandShim = join(directory, "pi.cmd");
       if (await executable(commandShim, platform)) {
-        const bundle = join(directory, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js");
-        if (await executable(bundle, platform)) return { command: process.execPath, prefixArgs: [bundle] };
+        const bundles = [
+          // Global npm shim: <global-bin>/node_modules/@scope/package/...
+          join(directory, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"),
+          // Local npm shim: <project>/node_modules/.bin/pi.cmd
+          join(directory, "..", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"),
+        ];
+        for (const bundle of bundles) {
+          if (await executable(bundle, platform)) return { command: process.execPath, prefixArgs: [bundle] };
+        }
         unsupportedWrapper = commandShim;
       }
     } else {
@@ -59,9 +66,13 @@ function sessionArguments(piArgs: string[]): string[] {
   return ["--extension", indicatorEntrypoint, ...piArgs];
 }
 
-export async function runPi(request: LaunchRequest, target: Executable): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+export async function runPi(
+  request: LaunchRequest,
+  target: Executable,
+  options: { leaseFactory?: typeof acquireLease } = {},
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   await validateLaunch(request);
-  const owner = await acquireLease(request.profile);
+  const owner = await (options.leaseFactory ?? acquireLease)(request.profile);
   let child;
   try {
     child = spawn(target.command, [...target.prefixArgs, ...sessionArguments(request.piArgs)], {
@@ -80,6 +91,9 @@ export async function runPi(request: LaunchRequest, target: Executable): Promise
     child.once("error", (error) => rejectOutcome(new ProfileError("PI_SPAWN_FAILED", `Could not start Pi: ${error.message}`)));
     child.once("exit", (code, signal) => resolveOutcome({ code, signal }));
   });
+  // Attach rejection handling immediately. Publication can fail before the
+  // normal `await outcome` path, while the child independently emits error.
+  const drainedOutcome = outcome.catch(() => undefined);
 
   const forwardedSignals: NodeJS.Signals[] = process.platform === "win32" ? ["SIGTERM"] : ["SIGTERM", "SIGHUP"];
   const handlers = new Map<NodeJS.Signals, () => void>();
@@ -109,8 +123,9 @@ export async function runPi(request: LaunchRequest, target: Executable): Promise
       await owner.setChild(child.pid);
     } catch (error) {
       retainLease = true;
-      child.kill("SIGTERM");
-      throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; the conservative lease was retained: ${(error as Error).message}`);
+      try { child.kill("SIGTERM"); } catch { /* The outcome still drains an already-exited child. */ }
+      await drainedOutcome;
+      throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; the child was reaped and the conservative lease was retained: ${(error as Error).message}`);
     }
     return await outcome;
   } finally {
