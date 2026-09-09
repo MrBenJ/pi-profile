@@ -91,12 +91,19 @@ export async function runPi(request: LaunchRequest, target: Executable): Promise
     process.on(signal, handler);
   }
 
+  let retainLease = false;
   try {
     if (!child.pid) return await outcome;
-    await owner.setChild(child.pid);
+    try {
+      await owner.setChild(child.pid);
+    } catch (error) {
+      retainLease = true;
+      child.kill("SIGTERM");
+      throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; the conservative lease was retained: ${(error as Error).message}`);
+    }
     return await outcome;
   } finally {
     for (const [signal, handler] of handlers) process.off(signal, handler);
-    await owner.release();
+    if (!retainLease) await owner.release();
   }
 }

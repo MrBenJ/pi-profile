@@ -6,7 +6,7 @@ import type { ProfileStore } from "./profile-store.js";
 import { validateName } from "./metadata.js";
 
 const excludedNames = new Set([".pi-profile.json", ".pi-profile-leases"]);
-const resourceKeys = new Set(["extensions", "skills", "prompts", "themes", "sessionDir"]);
+const resourceKeys = new Set(["extensions", "skills", "prompts", "themes", "packages", "source", "sessionDir"]);
 
 function isContained(parent: string, candidate: string): boolean {
   const path = relative(parent, candidate);

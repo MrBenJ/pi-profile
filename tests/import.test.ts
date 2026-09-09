@@ -60,8 +60,8 @@ test("excludes manager metadata from imported profiles", async () => {
 });
 
 test("reports but preserves explicit external resource paths", async () => {
-  await writeFile(join(source, "settings.json"), JSON.stringify({ extensions: ["/shared/ext.ts"], skills: ["~/shared-skills"], sessionDir: "/shared/sessions" }));
-  expect((await inspectImport(source)).externalResources).toEqual(["/shared/ext.ts", "~/shared-skills", "/shared/sessions"]);
+  await writeFile(join(source, "settings.json"), JSON.stringify({ extensions: ["/shared/ext.ts"], skills: ["~/shared-skills"], packages: [{ source: "/shared/package" }], sessionDir: "/shared/sessions" }));
+  expect((await inspectImport(source)).externalResources).toEqual(["/shared/ext.ts", "~/shared-skills", "/shared/package", "/shared/sessions"]);
   const imported = await importProfile(store, "personal", source);
   expect(JSON.parse(await readFile(join(imported.root, "settings.json"), "utf8")).sessionDir).toBe("/shared/sessions");
 });

@@ -12,6 +12,9 @@ describe("package manifest", () => {
     expect(pkg.engines.node).toBe(">=22.19.0");
     expect(pkg.peerDependencies["@earendil-works/pi-coding-agent"]).toBe("*");
     expect(pkg.dependencies?.["@earendil-works/pi-coding-agent"]).toBeUndefined();
+    expect(pkg.files).toEqual(["bin", "dist", "README.md", "LICENSE"]);
+    expect(pkg.files).not.toContain("tests");
+    expect(pkg.files).not.toContain(".worktrees");
   });
 
   test("public entrypoint sources exist for the build", async () => {

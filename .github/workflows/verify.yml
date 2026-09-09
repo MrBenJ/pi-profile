@@ -1,0 +1,38 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22.19.0
+          - os: macos-latest
+            node: 22.19.0
+          - os: windows-latest
+            node: 22.19.0
+          - os: ubuntu-latest
+            node: 24.x
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - name: Pack and install tarball
+        shell: bash
+        run: |
+          npm pack
+          mkdir package-smoke
+          cd package-smoke
+          npm init -y
+          npm install ../pi-profile-*.tgz
+          node -e "const p=require('./node_modules/pi-profile/package.json'); if (!p.bin['pi-profile'] || !p.pi.extensions[0]) process.exit(1)"

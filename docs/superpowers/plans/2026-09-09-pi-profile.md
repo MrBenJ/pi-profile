@@ -286,8 +286,8 @@ expect(transcriptCalls).toEqual([]);
 **Consumes:** Built CLI and extension from Tasks 1–7.
 **Produces:** A installable npm tarball, CI matrix and evidence-backed manual checklist.
 
-- [ ] Write a failing end-to-end test that creates work/personal using the built executable, configures different synthetic settings, launches both fake Pi children, compares roots/argv, and verifies no mutation of an existing unprofiled fixture. Test real Pi offline resource/session selection separately, including intentionally shared ambient skills and explicit session overrides.
-- [ ] Add Node/OS CI matrix with `npm ci` and `npm run verify` on macOS/Linux/Windows using the minimum supported Node. Add active LTS Linux. Include package install from the produced tarball in a temporary prefix; ensure both executable and extension resolve without development files.
+- [x] Write a failing end-to-end test that creates work/personal using the built executable, configures different synthetic settings, launches both fake Pi children, compares roots/argv, and verifies no mutation of an existing unprofiled fixture. Test real Pi offline resource/session selection separately, including intentionally shared ambient skills and explicit session overrides.
+- [x] Add Node/OS CI matrix with `npm ci` and `npm run verify` on macOS/Linux/Windows using the minimum supported Node. Add active LTS Linux. Include package install from the produced tarball in a temporary prefix; ensure both executable and extension resolve without development files.
 
 ```yaml
 strategy:
@@ -304,11 +304,11 @@ steps:
   - run: npm run verify
 ```
 
-- [ ] Document npm global installation, unchanged plain Pi, every CLI command, optional manual alias, supported Pi/Node versions, inherited-variable names, trusted-project exception, ambient/cloud limitations, import symlink failures, active-profile safeguards and explicit recovery. Do not claim OS isolation or protected host filesystem access.
-- [ ] Provide manual steps for different provider logins, refresh persistence, concurrent TUI indicators, profile-specific config/skills/trust/sessions, stale leases and Windows Ctrl+C. Real credentials remain a user action, not an automated fixture.
-- [ ] Run `npm run verify`, `npm pack --dry-run`, tarball smoke tests, and `git diff --check`. Save actual command/version/status evidence; mark other-platform and real-login checks unverified until run.
+- [x] Document npm global installation, unchanged plain Pi, every CLI command, optional manual alias, supported Pi/Node versions, inherited-variable names, trusted-project exception, ambient/cloud limitations, import symlink failures, active-profile safeguards and explicit recovery. Do not claim OS isolation or protected host filesystem access.
+- [x] Provide manual steps for different provider logins, refresh persistence, concurrent TUI indicators, profile-specific config/skills/trust/sessions, stale leases and Windows Ctrl+C. Real credentials remain a user action, not an automated fixture.
+- [x] Run `npm run verify`, `npm pack --dry-run`, tarball smoke tests, and `git diff --check`. Save actual command/version/status evidence; mark other-platform and real-login checks unverified until run.
 - [ ] Request independent read-only code review, fix confirmed findings serially with regression tests, rerun checks. Do not call a review process exiting zero an approval without reading its findings.
-- [ ] Commit the final verified state on the feature branch. If no authorized remote exists, deliver local branch/commit and unresolved manual checks; do not push/create a repository/merge. If a remote is subsequently authorized, follow the reviewed-PR workflow in no-merge mode.
+- [x] Commit the final verified state on the feature branch. If no authorized remote exists, deliver local branch/commit and unresolved manual checks; do not push/create a repository/merge. If a remote is subsequently authorized, follow the reviewed-PR workflow in no-merge mode.
 
 ## Plan self-review
 
