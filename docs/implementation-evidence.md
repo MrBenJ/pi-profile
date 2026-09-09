@@ -45,13 +45,26 @@ Claude Opus reviewed the branch read-only. The implementation worker did not spa
 
 Native built-CLI checks: PASS — `pi-profile work --offline auth --help` and `uninstall --help` produced Pi's native command help without indicator injection.
 
+## Independent review round 2 fixes
+
+Claude Opus performed a second full-feature read-only review. No further reviewer was delegated. Every reported item received a regression and fix:
+
+- rename journals now validate stale ownership, journal filename, metadata, exact source/staging/destination paths, and names before mutation; sole-source, sole-staging, and sole-committed-destination crash windows recover deterministically, while collisions and unsafe paths remain untouched;
+- orphan import staging without a valid owner marker now raises an actionable `RECOVERY_REQUIRED` error;
+- Windows imports preserve relative directory symlinks with type `dir`, never absolute staging junctions, and return `SYMLINK_PERMISSION` for missing Windows privilege; promotion and subsequent rename are covered;
+- `prepack` builds TypeScript, with a real `npm pack --json` regression starting from a copied checkout containing no `dist` directory;
+- a primary mutation failure remains the `AggregateError.cause` when owner-verified lock cleanup also fails, while cleanup context is retained;
+- SIGINT handling waits for/reaps the child and releases its lease, forwarding only for non-terminal single-process signals to avoid duplicate terminal delivery;
+- `--cwd` before a manager command reports targeted usage, and normal launch plus `config --pi` share signal exit mapping.
+
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
-- `npm run verify`: PASS — 15 test files, 184 tests; TypeScript no-emit check and compiled build passed.
+- `npm run verify`: PASS — 15 test files, 197 tests; TypeScript no-emit check and compiled build passed.
 - `npm pack --dry-run`: PASS — package contained only declared runtime/docs files.
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
+- Round-two final smoke: PASS — fresh `npm pack --dry-run`; native Pi offline `auth`/`uninstall` help through the built launcher; tarball exclusion scan; isolated tarball install; packed CLI help/version/profile creation; and `git diff --check`.
 - `git diff --check`: PASS.
 
 ## Not verified in this environment
@@ -60,4 +73,4 @@ Native built-CLI checks: PASS — `pi-profile work --offline auth --help` and `u
 - Real OAuth/API-key login, logout, refresh, provider account crossover, and cloud SDK default-file/metadata authentication were not tested. Those require user-controlled disposable accounts and may access networks.
 - Interactive TUI footer/title appearance, concurrent human TUI sessions, and manual trust/model/session selectors were not visually verified; RPC and extension harness behavior passed.
 - Destructive recovery from a real crash, PID reuse, unknown-host leases, and journal recovery were tested through synthetic interrupted state where automated, not through destructive host-level fault injection.
-- Independent read-only review round 1 completed; orchestrator round 2 is pending. No nested reviewer was launched by this worker.
+- Independent read-only review rounds 1 and 2 completed; orchestrator round 3 is pending. No nested reviewer was launched by this worker.

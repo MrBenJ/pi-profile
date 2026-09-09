@@ -15,6 +15,7 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 - [ ] Run `pi-profile import personal <source>` and review the credential/session/code warning plus external paths.
 - [ ] Confirm source bytes and timestamps are unchanged.
 - [ ] Confirm absolute, escaping, and dangling symlink fixtures are rejected without changing their targets.
+- [ ] On Windows with Developer Mode, import a relative directory symlink, rename the profile, and confirm the link remains relative and usable; with symlink privilege disabled, confirm import reports the required permission instead of creating a junction.
 - [ ] Run `pi-profile create work`.
 - [ ] Set different default directories and run `pi-profile config <name> --pi` for both profiles.
 
@@ -50,6 +51,7 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 - [ ] Create a same-host stale lease fixture; confirm interactive cleanup asks and scripted cleanup requires `--clear-stale-leases`.
 - [ ] Create an unknown-host lease fixture; confirm it is never cleared automatically.
 - [ ] Interrupt a disposable import process, verify ordinary commands report the lock owner, then run `pi-profile recover`; confirm only same-host/provably-dead owner artifacts are removed.
+- [ ] Interrupt rename before moving the source, while staged, and after destination promotion; confirm recovery respectively restores source metadata, moves staging back to source, or verifies the committed destination. Add a collision and confirm recovery changes nothing.
 - [ ] Attempt recovery with a live PID, inaccessible PID state, malformed owner, and another hostname; confirm every case remains blocked and unchanged.
 - [ ] Run `/profile`; confirm it displays only name/root and cannot switch profiles.
 
@@ -57,7 +59,7 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 
 - [ ] Verify npm's `pi.cmd` resolves to the installed Node CLI without `shell:true`.
 - [ ] Test spaces, metacharacters, and Unicode in profile cwd and Pi arguments.
-- [ ] Test Ctrl+C from Windows Terminal and confirm one clean child termination plus retained evidence if the child survives.
+- [ ] Test Ctrl+C from Windows Terminal and confirm Pi receives one terminal interrupt, the launcher waits for it to exit, and the lease is removed; retain conservative evidence if the child survives.
 - [ ] Confirm path/device-name validation and normal current-user ACL behavior.
 
 ## Linux-specific
