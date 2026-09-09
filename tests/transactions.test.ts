@@ -53,6 +53,26 @@ test("lock release verifies its owner token before unlinking", async () => {
   await expect(readFile(lock, "utf8")).resolves.toContain("replacement");
 });
 
+test("an operation failure remains primary when lock cleanup also fails", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pi-profile-lock-errors-"));
+  fixtures.push(root);
+  const lock = join(root, ".pi-profile.lock");
+  const primary = new Error("primary operation failure");
+  let caught: unknown;
+  try {
+    await withMutationLock(root, async () => {
+      await writeFile(lock, JSON.stringify({ version: 1, id: "replacement", hostname: hostname(), pid: process.pid, createdAt: new Date().toISOString() }));
+      throw primary;
+    });
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(AggregateError);
+  expect((caught as AggregateError).cause).toBe(primary);
+  expect((caught as Error).message).toMatch(/primary operation failure.*cleanup/i);
+  await expect(readFile(lock, "utf8")).resolves.toContain("replacement");
+});
+
 test("atomic JSON writes complete metadata with restrictive mode", async () => {
   const root = await mkdtemp(join(tmpdir(), "pi-profile-atomic-"));
   fixtures.push(root);

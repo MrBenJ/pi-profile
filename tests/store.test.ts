@@ -107,6 +107,71 @@ describe("ProfileStore", () => {
     await expect(store.list()).resolves.toEqual([]);
   });
 
+  test.each([
+    ["source", "work"],
+    ["staging", "work"],
+    ["destination", "office"],
+  ] as const)("recovers deterministic rename crash window with only %s present", async (present, expectedName) => {
+    await mkdir(profilesRoot, { recursive: true });
+    const token = `rename-${present}`;
+    const owner = { version: 1 as const, id: token, hostname: hostname(), pid: 2147483647, createdAt: now().toISOString() };
+    const original = metadata("work");
+    const updated = { ...original, name: "office" };
+    const sourcePath = join(profilesRoot, "work");
+    const staging = join(profilesRoot, `.pi-profile-rename-work-${token}`);
+    const destination = join(profilesRoot, "office");
+    const existing = present === "source" ? sourcePath : present === "staging" ? staging : destination;
+    await mkdir(existing);
+    await writeFile(join(existing, ".pi-profile.json"), JSON.stringify(updated));
+    const journal = join(profilesRoot, `.pi-profile-journal-${token}.json`);
+    await writeFile(journal, JSON.stringify({ ...owner, operation: "rename", source: sourcePath, staging, destination, originalMetadata: original }));
+
+    await expect(store.recover()).resolves.toMatchObject({ transactionsRecovered: 1 });
+    expect((await store.list()).map((profile) => profile.metadata.name)).toEqual([expectedName]);
+    if (expectedName === "work") expect((await store.get("work")).metadata).toEqual(original);
+    await expect(readFile(journal)).rejects.toThrow();
+  });
+
+  test("rename recovery refuses ambiguous collisions without modifying either profile", async () => {
+    await mkdir(profilesRoot, { recursive: true });
+    const token = "rename-ambiguous";
+    const owner = { version: 1 as const, id: token, hostname: hostname(), pid: 2147483647, createdAt: now().toISOString() };
+    const original = metadata("work");
+    const sourcePath = join(profilesRoot, "work");
+    const destination = join(profilesRoot, "office");
+    const staging = join(profilesRoot, `.pi-profile-rename-work-${token}`);
+    for (const [path, value] of [[sourcePath, original], [destination, { ...original, name: "office" }]] as const) {
+      await mkdir(path);
+      await writeFile(join(path, ".pi-profile.json"), JSON.stringify(value));
+    }
+    const journal = join(profilesRoot, `.pi-profile-journal-${token}.json`);
+    await writeFile(journal, JSON.stringify({ ...owner, operation: "rename", source: sourcePath, staging, destination, originalMetadata: original }));
+    await expect(store.recover()).rejects.toThrow(/ambiguous/i);
+    expect(JSON.parse(await readFile(join(sourcePath, ".pi-profile.json"), "utf8"))).toEqual(original);
+    expect(JSON.parse(await readFile(join(destination, ".pi-profile.json"), "utf8"))).toEqual({ ...original, name: "office" });
+    await expect(readFile(journal)).resolves.toBeTruthy();
+  });
+
+  test("rename recovery validates owned paths before writing", async () => {
+    const profile = await store.create(metadata("work"));
+    const outside = join(fixture, "outside");
+    await mkdir(outside);
+    await writeFile(join(outside, ".pi-profile.json"), "untouched");
+    const token = "rename-tampered";
+    const owner = { version: 1 as const, id: token, hostname: hostname(), pid: 2147483647, createdAt: now().toISOString() };
+    const journal = join(profilesRoot, `.pi-profile-journal-${token}.json`);
+    await writeFile(journal, JSON.stringify({ ...owner, operation: "rename", source: profile.root, staging: outside, destination: join(profilesRoot, "office"), originalMetadata: metadata("work") }));
+    await expect(store.recover()).rejects.toThrow(/unsafe|manual recovery/i);
+    expect(await readFile(join(outside, ".pi-profile.json"), "utf8")).toBe("untouched");
+    expect(JSON.parse(await readFile(join(profile.root, ".pi-profile.json"), "utf8"))).toEqual(metadata("work"));
+  });
+
+  test("orphan staging without an owner marker raises an actionable typed error", async () => {
+    await mkdir(join(profilesRoot, ".pi-profile-create-work-orphan"), { recursive: true });
+    await expect(store.recover()).rejects.toMatchObject({ code: "RECOVERY_REQUIRED" });
+    await expect(store.recover()).rejects.toThrow(/owner marker|verify owned staging/i);
+  });
+
   test("concurrent creates publish only one profile", async () => {
     const results = await Promise.allSettled([store.create(metadata("work")), store.create(metadata("work"))]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);

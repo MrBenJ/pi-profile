@@ -136,12 +136,30 @@ export async function withMutationLock<T>(profilesRoot: string, operation: () =>
     }
   }
   if (!handle) throw new ProfileError("LOCK_BUSY", `Could not acquire profile mutation lock: ${lockPath}`);
+  let result: T | undefined;
+  let primaryError: unknown;
   try {
-    return await operation();
-  } finally {
-    await handle.close().catch(() => undefined);
-    await ownerVerifiedRemove(lockPath, owner);
+    result = await operation();
+  } catch (error) {
+    primaryError = error;
   }
+  await handle.close().catch(() => undefined);
+  try {
+    await ownerVerifiedRemove(lockPath, owner);
+  } catch (cleanupError) {
+    if (primaryError !== undefined) {
+      const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+      const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+      throw new AggregateError(
+        [primaryError, cleanupError],
+        `${primaryMessage}; lock cleanup also failed: ${cleanupMessage}`,
+        { cause: primaryError },
+      );
+    }
+    throw cleanupError;
+  }
+  if (primaryError !== undefined) throw primaryError;
+  return result as T;
 }
 
 export async function atomicWriteJson(path: string, value: unknown): Promise<void> {

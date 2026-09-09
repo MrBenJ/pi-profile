@@ -83,7 +83,7 @@ export class ProfileStore {
         await this.assertNoUncertainJournalUnlocked();
         if (await pathKind(destination) !== "missing") throw new ProfileError("PROFILE_EXISTS", `Profile already exists: ${parsed.name}`);
         const journal = transactionPath(this.profilesRoot, owner.id);
-        await atomicWriteJson(journal, { ...owner, operation: "create", staging, destination });
+        await atomicWriteJson(journal, { ...owner, operation: "create", staging, destination, metadata: parsed });
         try {
           await this.fault?.("create-before-promotion");
           await rename(staging, destination);
@@ -215,9 +215,13 @@ export class ProfileStore {
   async recover(): Promise<{ lockRecovered: boolean; transactionsRecovered: number; stagesRecovered: number }> {
     const lock = await recoverMutationLock(this.profilesRoot);
     return withMutationLock(this.profilesRoot, async () => {
-      let transactionsRecovered = 0;
-      const referencedStages = new Set<string>();
       const entries = await readdir(this.profilesRoot);
+      const recoveries: Array<
+        | { operation: "create"; journalPath: string; owner: MutationOwner; staging: string; destination: string; metadata?: ProfileMetadata }
+        | { operation: "rename"; journalPath: string; owner: MutationOwner; source: string; staging: string; destination: string; original: ProfileMetadata; updated: ProfileMetadata }
+      > = [];
+
+      // Validate every journal and every path before mutating any transaction state.
       for (const entry of entries.filter((name) => name.startsWith(JOURNAL_PREFIX) && name.endsWith(".json"))) {
         const journalPath = join(this.profilesRoot, entry);
         let journal: Record<string, unknown>;
@@ -228,24 +232,46 @@ export class ProfileStore {
         }
         const owner = parseMutationOwner(journal, journalPath);
         assertStaleMutationOwner(owner, `transaction journal ${journalPath}`);
-        if (journal.operation !== "create" || typeof journal.staging !== "string" || typeof journal.destination !== "string") {
-          throw new ProfileError("RECOVERY_REQUIRED", `Transaction requires manual recovery: ${journalPath}`);
+        if (entry !== `${JOURNAL_PREFIX}${owner.id}.json`) {
+          throw new ProfileError("RECOVERY_REQUIRED", `Transaction journal filename does not match its owner: ${journalPath}`);
         }
-        this.assertOwnedChild(journal.staging, `.pi-profile-create-`, "staging directory");
+        if (typeof journal.staging !== "string" || typeof journal.destination !== "string") {
+          throw new ProfileError("RECOVERY_REQUIRED", `Transaction paths are missing: ${journalPath}`);
+        }
         this.assertOwnedChild(journal.destination, undefined, "destination");
-        referencedStages.add(journal.staging);
-        const stageKind = await pathKind(journal.staging);
-        const destinationKind = await pathKind(journal.destination);
-        if (stageKind === "directory" && destinationKind === "missing") {
-          await this.verifyStageOwner(journal.staging, owner);
-          await rm(journal.staging, { recursive: true });
-        } else if (stageKind === "missing" && destinationKind === "directory") {
-          await this.verifyStageOwner(journal.destination, owner);
-          await rm(join(journal.destination, STAGE_MARKER), { force: true });
-        } else if (!(stageKind === "missing" && destinationKind === "missing")) {
-          throw new ProfileError("RECOVERY_REQUIRED", `Transaction paths are ambiguous; inspect ${journalPath}`);
+        const destinationName = validateName(basename(journal.destination));
+
+        if (journal.operation === "create") {
+          const expectedStage = join(this.profilesRoot, `.pi-profile-create-${destinationName}-${owner.id}`);
+          if (journal.staging !== expectedStage) throw new ProfileError("RECOVERY_REQUIRED", `Unsafe staging directory in transaction journal: ${journal.staging}`);
+          let metadata: ProfileMetadata | undefined;
+          if (journal.metadata !== undefined) {
+            metadata = parseMetadata(journal.metadata);
+            if (metadata.name !== destinationName) throw new ProfileError("RECOVERY_REQUIRED", `Create metadata does not match destination: ${journalPath}`);
+          }
+          recoveries.push({ operation: "create", journalPath, owner, staging: journal.staging, destination: journal.destination, ...(metadata ? { metadata } : {}) });
+          continue;
         }
-        await rm(journalPath);
+
+        if (journal.operation === "rename" && typeof journal.source === "string") {
+          const original = parseMetadata(journal.originalMetadata);
+          const source = profilePath(this.profilesRoot, original.name);
+          const expectedStage = join(this.profilesRoot, `.pi-profile-rename-${original.name}-${owner.id}`);
+          if (journal.source !== source || journal.staging !== expectedStage || source === journal.destination || destinationName === original.name) {
+            throw new ProfileError("RECOVERY_REQUIRED", `Unsafe rename paths in transaction journal: ${journalPath}`);
+          }
+          recoveries.push({ operation: "rename", journalPath, owner, source, staging: journal.staging, destination: journal.destination, original, updated: { ...original, name: destinationName } });
+          continue;
+        }
+        throw new ProfileError("RECOVERY_REQUIRED", `Unknown transaction operation requires manual recovery: ${journalPath}`);
+      }
+
+      const referencedStages = new Set(recoveries.map((recovery) => recovery.staging));
+      let transactionsRecovered = 0;
+      for (const recovery of recoveries) {
+        if (recovery.operation === "create") await this.recoverCreate(recovery);
+        else await this.recoverRename(recovery);
+        await rm(recovery.journalPath);
         transactionsRecovered += 1;
       }
 
@@ -254,14 +280,84 @@ export class ProfileStore {
         if (!entry.startsWith(".pi-profile-create-")) continue;
         const stage = join(this.profilesRoot, entry);
         if (referencedStages.has(stage) || await pathKind(stage) !== "directory") continue;
-        const owner = parseMutationOwner(JSON.parse(await readFile(join(stage, STAGE_MARKER), "utf8")), stage);
+        const owner = await this.readStageOwner(stage);
         assertStaleMutationOwner(owner, `staging directory ${stage}`);
-        await this.verifyStageOwner(stage, owner);
         await rm(stage, { recursive: true });
         stagesRecovered += 1;
       }
       return { lockRecovered: lock.recovered, transactionsRecovered, stagesRecovered };
     });
+  }
+
+  private async recoverCreate(recovery: { journalPath: string; owner: MutationOwner; staging: string; destination: string; metadata?: ProfileMetadata }): Promise<void> {
+    const stageKind = await pathKind(recovery.staging);
+    const destinationKind = await pathKind(recovery.destination);
+    if (stageKind === "directory" && destinationKind === "missing") {
+      await this.verifyStageOwner(recovery.staging, recovery.owner);
+      await rm(recovery.staging, { recursive: true });
+      return;
+    }
+    if (stageKind === "missing" && destinationKind === "directory") {
+      if (await pathKind(join(recovery.destination, STAGE_MARKER)) === "file") {
+        await this.verifyStageOwner(recovery.destination, recovery.owner);
+      } else if (!recovery.metadata) {
+        throw new ProfileError("RECOVERY_REQUIRED", `Cannot verify committed create destination: ${recovery.destination}`);
+      }
+      if (recovery.metadata) await this.assertProfileMetadata(recovery.destination, [recovery.metadata]);
+      await rm(join(recovery.destination, STAGE_MARKER), { force: true });
+      return;
+    }
+    throw new ProfileError("RECOVERY_REQUIRED", `Create transaction paths are ambiguous; inspect ${recovery.journalPath}`);
+  }
+
+  private async recoverRename(recovery: { journalPath: string; source: string; staging: string; destination: string; original: ProfileMetadata; updated: ProfileMetadata }): Promise<void> {
+    const [sourceKind, stageKind, destinationKind] = await Promise.all([
+      pathKind(recovery.source), pathKind(recovery.staging), pathKind(recovery.destination),
+    ]);
+    const directories = [sourceKind, stageKind, destinationKind].filter((kind) => kind === "directory").length;
+    if (directories !== 1 || [sourceKind, stageKind, destinationKind].some((kind) => kind !== "directory" && kind !== "missing")) {
+      throw new ProfileError("RECOVERY_REQUIRED", `Rename transaction paths are ambiguous; inspect ${recovery.journalPath}`);
+    }
+    if (sourceKind === "directory") {
+      const current = await this.assertProfileMetadata(recovery.source, [recovery.original, recovery.updated]);
+      if (!this.sameMetadata(current, recovery.original)) await atomicWriteJson(join(recovery.source, MARKER), recovery.original);
+      return;
+    }
+    if (stageKind === "directory") {
+      await this.assertProfileMetadata(recovery.staging, [recovery.original, recovery.updated]);
+      await atomicWriteJson(join(recovery.staging, MARKER), recovery.original);
+      await rename(recovery.staging, recovery.source);
+      return;
+    }
+    await this.assertProfileMetadata(recovery.destination, [recovery.updated]);
+  }
+
+  private sameMetadata(left: ProfileMetadata, right: ProfileMetadata): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  private async assertProfileMetadata(root: string, allowed: ProfileMetadata[]): Promise<ProfileMetadata> {
+    const marker = join(root, MARKER);
+    if (await pathKind(marker) !== "file") throw new ProfileError("RECOVERY_REQUIRED", `Cannot verify profile marker during recovery: ${marker}`);
+    let metadata: ProfileMetadata;
+    try {
+      metadata = parseMetadata(JSON.parse(await readFile(marker, "utf8")));
+    } catch {
+      throw new ProfileError("RECOVERY_REQUIRED", `Cannot verify profile marker during recovery: ${marker}`);
+    }
+    if (!allowed.some((candidate) => this.sameMetadata(metadata, candidate))) {
+      throw new ProfileError("RECOVERY_REQUIRED", `Profile marker does not match transaction ownership: ${marker}`);
+    }
+    return metadata;
+  }
+
+  private async readStageOwner(stage: string): Promise<MutationOwner> {
+    const marker = join(stage, STAGE_MARKER);
+    try {
+      return parseMutationOwner(JSON.parse(await readFile(marker, "utf8")), marker);
+    } catch {
+      throw new ProfileError("RECOVERY_REQUIRED", `Cannot verify owned staging directory; owner marker is missing or invalid: ${marker}`);
+    }
   }
 
   private assertOwnedChild(path: string, requiredPrefix: string | undefined, label: string): void {
@@ -271,12 +367,7 @@ export class ProfileStore {
   }
 
   private async verifyStageOwner(stage: string, owner: MutationOwner): Promise<void> {
-    let marker: MutationOwner;
-    try {
-      marker = parseMutationOwner(JSON.parse(await readFile(join(stage, STAGE_MARKER), "utf8")), stage);
-    } catch {
-      throw new ProfileError("RECOVERY_REQUIRED", `Cannot verify owned staging directory: ${stage}`);
-    }
+    const marker = await this.readStageOwner(stage);
     if (marker.id !== owner.id || marker.hostname !== owner.hostname || marker.pid !== owner.pid) {
       throw new ProfileError("RECOVERY_REQUIRED", `Staging owner does not match transaction owner: ${stage}`);
     }
