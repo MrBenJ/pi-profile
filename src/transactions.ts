@@ -57,11 +57,24 @@ export function assertStaleMutationOwner(owner: MutationOwner, context: string):
 }
 
 async function ownerVerifiedRemove(path: string, owner: MutationOwner): Promise<void> {
-  const current = await readOwner(path);
-  if (current.id !== owner.id || current.hostname !== owner.hostname || current.pid !== owner.pid) {
-    throw new ProfileError("LOCK_OWNERSHIP_LOST", `Mutation lock ownership changed; refusing to remove ${path}`);
+  const quarantine = `${path}.release-${randomUUID()}`;
+  await rename(path, quarantine);
+  try {
+    const current = await readOwner(quarantine);
+    if (current.id !== owner.id || current.hostname !== owner.hostname || current.pid !== owner.pid) {
+      throw new ProfileError("LOCK_OWNERSHIP_LOST", `Mutation lock ownership changed; refusing to remove ${path}`);
+    }
+    await rm(quarantine);
+  } catch (error) {
+    try {
+      await rename(quarantine, path);
+    } catch (restoreError) {
+      if ((restoreError as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw new ProfileError("LOCK_OWNERSHIP_LOST", `Mutation lock ownership changed and remains quarantined at ${quarantine}`);
+      }
+    }
+    throw error;
   }
-  await rm(path);
 }
 
 export async function recoverMutationLock(profilesRoot: string): Promise<{ recovered: boolean; owner?: MutationOwner }> {
