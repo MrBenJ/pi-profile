@@ -23,6 +23,11 @@ describe("package manifest", () => {
     expect(pkg.scripts.prepack).toBe("npm run build");
   });
 
+  test("ignores interrupted fresh-pack fixtures", async () => {
+    const ignore = await readFile(resolve(root, ".gitignore"), "utf8");
+    expect(ignore.split(/\r?\n/u)).toContain("/.pack-fixture-*/");
+  });
+
   test("public entrypoint sources exist for the build", async () => {
     await expect(access(resolve(root, "src/cli.ts"))).resolves.toBeUndefined();
     await expect(access(resolve(root, "src/extension.ts"))).resolves.toBeUndefined();

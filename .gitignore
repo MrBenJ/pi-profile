@@ -1,4 +1,5 @@
 /.worktrees/
+/.pack-fixture-*/
 /node_modules/
 /dist/
 /coverage/
