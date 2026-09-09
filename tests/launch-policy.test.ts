@@ -39,11 +39,13 @@ test.each([
   [["update", "--all"], "management"],
   [["list"], "management"],
   [["auth", "status"], "management"],
-  [["--offline", "auth", "--help"], "management"],
-  [["--export=transcript.html"], "management"],
+  [["--offline", "auth", "--help"], "session"],
+  [["-c", "list"], "session"],
+  [["--export=transcript.html"], "session"],
   [["--provider", "auth", "hello"], "session"],
   [["-p", "auth"], "session"],
   [["--mode", "json", "hello"], "session"],
+  [["--export", "transcript.jsonl"], "management"],
   [["--", "auth"], "session"],
 ] as const)("classifies %j as %s", (args, expected) => expect(classifyInvocation([...args])).toBe(expected));
 

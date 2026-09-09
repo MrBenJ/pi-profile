@@ -43,10 +43,16 @@ test("injects extension before a separator and not for native management command
   await runPi(request(["--", "prompt"]), executable);
   let captured = JSON.parse(await readFile(capture, "utf8"));
   expect(captured.argv.indexOf("--extension")).toBeLessThan(captured.argv.indexOf("--"));
-  for (const args of [["config"], ["auth", "status"], ["uninstall", "npm:pkg"], ["--offline", "auth", "--help"]]) {
+  for (const args of [["config"], ["auth", "status"], ["uninstall", "npm:pkg"], ["--export", "session.jsonl"]]) {
     await runPi(request(args), executable);
     captured = JSON.parse(await readFile(capture, "utf8"));
     expect(captured.argv).toEqual(args);
+  }
+  for (const args of [["--offline", "auth", "--help"], ["-c", "list"], ["--export=session.jsonl"]]) {
+    await runPi(request(args), executable);
+    captured = JSON.parse(await readFile(capture, "utf8"));
+    expect(captured.argv.slice(-args.length)).toEqual(args);
+    expect(captured.argv[0]).toBe("--extension");
   }
 });
 
