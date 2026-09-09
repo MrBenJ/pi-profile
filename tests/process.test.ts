@@ -39,13 +39,15 @@ test("spawns with exact argument vector, cwd, and filtered profile environment",
   expect((await inspectLeases(profile)).active).toHaveLength(0);
 });
 
-test("injects extension before a separator and not for management commands", async () => {
+test("injects extension before a separator and not for native management commands", async () => {
   await runPi(request(["--", "prompt"]), executable);
   let captured = JSON.parse(await readFile(capture, "utf8"));
   expect(captured.argv.indexOf("--extension")).toBeLessThan(captured.argv.indexOf("--"));
-  await runPi(request(["config"]), executable);
-  captured = JSON.parse(await readFile(capture, "utf8"));
-  expect(captured.argv).toEqual(["config"]);
+  for (const args of [["config"], ["auth", "status"], ["uninstall", "npm:pkg"], ["--offline", "auth", "--help"]]) {
+    await runPi(request(args), executable);
+    captured = JSON.parse(await readFile(capture, "utf8"));
+    expect(captured.argv).toEqual(args);
+  }
 });
 
 test("propagates nonzero and signal exits", async () => {

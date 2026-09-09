@@ -34,10 +34,16 @@ test("rejects missing or non-directory working directories", async () => {
 test.each([
   [["config"], "management"],
   [["install", "npm:thing"], "management"],
+  [["remove", "npm:thing"], "management"],
+  [["uninstall", "npm:thing"], "management"],
   [["update", "--all"], "management"],
-  [["-p", "config"], "session"],
+  [["list"], "management"],
+  [["auth", "status"], "management"],
+  [["--offline", "auth", "--help"], "management"],
+  [["--provider", "auth", "hello"], "session"],
+  [["-p", "auth"], "session"],
   [["--mode", "json", "hello"], "session"],
-  [["--", "config"], "session"],
+  [["--", "auth"], "session"],
 ] as const)("classifies %j as %s", (args, expected) => expect(classifyInvocation([...args])).toBe(expected));
 
 test("launch validation leaves native session and resource arguments untouched", async () => {
