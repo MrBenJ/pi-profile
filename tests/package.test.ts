@@ -1,12 +1,14 @@
 import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
+import { VERSION } from "../src/version.js";
 
 const root = resolve(import.meta.dirname, "..");
 
 describe("package manifest", () => {
   test("declares the CLI and extension entrypoints", async () => {
     const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+    expect(pkg.version).toBe(VERSION);
     expect(pkg.bin["pi-profile"]).toBe("bin/pi-profile.js");
     expect(pkg.pi.extensions).toEqual(["./dist/extension.js"]);
     expect(pkg.engines.node).toBe(">=22.19.0");

@@ -43,6 +43,11 @@ describe("parseCli", () => {
     expect(parseCli(["--cwd", "/repo", "work", "-p", "--", "- literal"])).toEqual({ command: "launch", profile: "work", cwd: "/repo", piArgs: ["-p", "--", "- literal"] });
   });
   test.each([
+    [["--help"], { command: "help" }],
+    [["-h"], { command: "help" }],
+    [["help"], { command: "help" }],
+    [["--version"], { command: "version" }],
+    [["-v"], { command: "version" }],
     [["create", "work"], { command: "create", name: "work" }],
     [["list"], { command: "list" }],
     [["recover"], { command: "recover" }],
@@ -58,6 +63,14 @@ describe("parseCli", () => {
   ] as const)("parses %j", (argv, expected) => expect(parseCli([...argv])).toEqual(expected));
 });
 
+test("help and version are usable without profiles", async () => {
+  expect(await main(["--help"], deps)).toBe(0);
+  expect(stdout.join("\n")).toContain("Usage: pi-profile");
+  stdout = [];
+  expect(await main(["--version"], deps)).toBe(0);
+  expect(stdout).toEqual(["0.1.0"]);
+});
+
 test("create, list, show, and rename avoid secret-bearing contents", async () => {
   expect(await main(["create", "work"], deps)).toBe(0);
   expect(await main(["list"], deps)).toBe(0);
@@ -71,6 +84,7 @@ test("remove requires exact typed confirmation unless forced", async () => {
   await create("work");
   deps = { ...deps, isTTY: true, input: async () => "wrong" };
   expect(await main(["remove", "work"], deps)).toBe(1);
+  expect(stderr.join("\n")).toContain("Cancelled");
   await expect(store.get("work")).resolves.toBeDefined();
   expect(await main(["remove", "work", "--force"], deps)).toBe(0);
 });
@@ -117,7 +131,19 @@ test("bare launch uses picker only with a TTY and cancellation mutates nothing",
   await create("work");
   deps = { ...deps, isTTY: true, select: async () => undefined };
   expect(await main([], deps)).toBe(1);
+  expect(stderr.join("\n")).toContain("Cancelled");
   expect(launched).toEqual([]);
+});
+
+test("interactive import and config cancellation are explicit", async () => {
+  deps = { ...deps, isTTY: true, confirm: async () => false };
+  expect(await main(["import", "personal", fixture], deps)).toBe(1);
+  expect(stderr.join("\n")).toContain("Cancelled");
+  await create("work");
+  stderr = [];
+  deps = { ...deps, select: async () => undefined };
+  expect(await main(["config", "work"], deps)).toBe(1);
+  expect(stderr.join("\n")).toContain("Cancelled");
 });
 
 test("explicit launch rejects unknown profiles and forwards native Pi management", async () => {

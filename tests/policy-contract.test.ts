@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -28,7 +28,11 @@ test("does not invent strict skill or session exclusions", async () => {
     expect(forwarded).not.toContain("--no-skills");
     expect(env.HOME).toBe(home);
     expect(env.PI_CODING_AGENT_SESSION_DIR).toBe(join(fixture, "explicit-sessions"));
-    expect(resources).toHaveLength(3);
+    await expect(Promise.all(resources.map((path) => readFile(path, "utf8")))).resolves.toEqual([
+      "synthetic skill",
+      "synthetic skill",
+      "synthetic skill",
+    ]);
   } finally {
     await rm(fixture, { recursive: true, force: true });
   }

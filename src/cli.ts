@@ -11,6 +11,28 @@ import { validateEnvironmentName } from "./metadata.js";
 import { ProfileStore } from "./profile-store.js";
 import { createPrompts } from "./prompts.js";
 import { resolvePi, runPi as spawnPi } from "./process.js";
+import { VERSION } from "./version.js";
+
+const HELP = `Usage: pi-profile [--cwd <directory>] [profile] [Pi arguments...]
+
+Commands:
+  create [name]                         Create a profile
+  list                                  List profiles
+  show <name>                           Show non-secret profile metadata
+  recover                               Recover verified stale manager artifacts
+  rename <old> <new>                    Rename an inactive profile
+  remove <name> [--force]               Remove an inactive profile
+  import <name> <source> [--yes]        Copy an existing Pi configuration
+  config <name> <operation>             Configure profile metadata or run Pi config
+
+Run Pi management commands after a profile, for example:
+  pi-profile work auth status
+  pi-profile work uninstall npm:package
+
+Options:
+  --cwd <directory>  Select launch working directory (before profile)
+  --help, -h         Show this help
+  --version, -v      Show version`;
 
 export type ConfigOperation =
   | { type: "pi" }
@@ -20,6 +42,8 @@ export type ConfigOperation =
   | { type: "no-inherit"; name: string };
 
 export type CliCommand =
+  | { command: "help" }
+  | { command: "version" }
   | { command: "launch"; profile?: string; cwd?: string; piArgs: string[] }
   | { command: "create"; name?: string }
   | { command: "list" }
@@ -60,6 +84,14 @@ function takeValue(args: string[], index: number, flag: string): string {
 
 export function parseCli(argv: string[]): CliCommand {
   if (argv.length === 0) return { command: "launch", piArgs: [] };
+  if (["--help", "-h", "help"].includes(argv[0]!)) {
+    if (argv.length !== 1) usage("Help does not accept additional arguments");
+    return { command: "help" };
+  }
+  if (["--version", "-v"].includes(argv[0]!)) {
+    if (argv.length !== 1) usage("Version does not accept additional arguments");
+    return { command: "version" };
+  }
   if (argv[0] === "--cwd") {
     const cwd = takeValue(argv, 0, "--cwd");
     const profile = argv[2];
@@ -154,7 +186,10 @@ async function launchProfile(command: Extract<CliCommand, { command: "launch" }>
     const profiles = await deps.store.list();
     if (!profiles.length) throw new ProfileError("NO_PROFILES", "No profiles exist; run pi-profile create <name>");
     name = await deps.select("Select a Pi profile:", profiles.map((profile) => profile.metadata.name));
-    if (!name) return 1;
+    if (!name) {
+      deps.stderr("pi-profile: Cancelled: no profile selected");
+      return 1;
+    }
   }
   let profile: Profile;
   try {
@@ -183,6 +218,12 @@ async function retryStale(operation: (clear: boolean) => Promise<void>, clear: b
 
 async function dispatch(command: CliCommand, deps: CliDependencies): Promise<number> {
   switch (command.command) {
+    case "help":
+      deps.stdout(HELP);
+      return 0;
+    case "version":
+      deps.stdout(VERSION);
+      return 0;
     case "launch": return launchProfile(command, deps);
     case "create": {
       const name = await requiredValue(command.name, "Profile name", deps);
@@ -219,7 +260,10 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       if (!command.force) {
         if (!deps.isTTY) usage("Non-interactive removal requires --force");
         const typed = await deps.input(`Type ${name} to permanently delete ${profile.root}:`);
-        if (typed !== name) return 1;
+        if (typed !== name) {
+          deps.stderr(`pi-profile: Cancelled: ${name} was not removed`);
+          return 1;
+        }
       }
       await retryStale((clear) => deps.store.remove(name, { clearStaleLeases: clear }), command.clearStaleLeases, deps);
       deps.stdout(`Removed ${name}`);
@@ -233,7 +277,10 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       for (const path of inspection.externalResources) deps.stdout(`External resource preserved: ${path}`);
       if (!command.yes) {
         if (!deps.isTTY) usage("Non-interactive import requires --yes");
-        if (!await deps.confirm(`Import ${source} as ${name}?`)) return 1;
+        if (!await deps.confirm(`Import ${source} as ${name}?`)) {
+          deps.stderr(`pi-profile: Cancelled: ${name} was not imported`);
+          return 1;
+        }
       }
       const profile = await deps.importProfile(deps.store, name, source);
       deps.stdout(`Imported ${profile.metadata.name}: ${profile.root}`);
@@ -245,7 +292,10 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       if (!operation) {
         if (!deps.isTTY) usage("A config operation is required in non-interactive mode");
         const choice = await deps.select("Configure profile:", ["pi", "default-cwd", "clear-default-cwd", "inherit", "no-inherit"]);
-        if (!choice) return 1;
+        if (!choice) {
+          deps.stderr(`pi-profile: Cancelled: ${name} was not changed`);
+          return 1;
+        }
         if (choice === "pi") operation = { type: "pi" };
         else if (choice === "clear-default-cwd") operation = { type: "clear-default-cwd" };
         else {
