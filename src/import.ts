@@ -129,10 +129,10 @@ async function copyTree(
     } else if (before.isDirectory()) {
       await mkdir(to, { mode: 0o700 });
       await copyTree(sourceRoot, from, to, options);
-      if (process.platform !== "win32") await chmod(to, 0o700);
+      if (options.platform !== "win32") await chmod(to, 0o700);
     } else if (before.isFile()) {
       await copyFile(from, to);
-      if (process.platform !== "win32") await chmod(to, before.mode & 0o100 ? 0o700 : 0o600);
+      if (options.platform !== "win32") await chmod(to, before.mode & 0o100 ? 0o700 : 0o600);
     } else {
       throw new ProfileError("UNSUPPORTED_IMPORT_ENTRY", `Import rejects special filesystem entry: ${from}`);
     }

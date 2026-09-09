@@ -42,6 +42,9 @@ test("preserves relative directory symlinks through promotion and profile rename
   const imported = await importProfile(store, "personal", source, { platform: "win32" });
   expect(await readlink(join(imported.root, "session-link"))).toBe("sessions");
   expect(await readFile(join(imported.root, "session-link", "one.jsonl"), "utf8")).toBe("synthetic session");
+  if (process.platform !== "win32") {
+    expect((await lstat(join(imported.root, "auth.json"))).mode & 0o777).toBe((await lstat(join(source, "auth.json"))).mode & 0o777);
+  }
   await store.rename("personal", "private");
   expect(await readlink(join(fixture, "profiles", "private", "session-link"))).toBe("sessions");
   expect(await readFile(join(fixture, "profiles", "private", "session-link", "one.jsonl"), "utf8")).toBe("synthetic session");
