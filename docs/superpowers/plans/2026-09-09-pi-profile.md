@@ -264,7 +264,7 @@ expect(parseCli(["--cwd", "/repo", "work", "-p", "--", "- literal"])).toEqual({
 **Consumes:** `PI_PROFILE_NAME` and `PI_CODING_AGENT_DIR` provided by launcher, Pi public API.
 **Produces:** Default extension factory with session_start handler and `/profile` command.
 
-- [ ] Write a fake ExtensionAPI test harness recording registrations and UI calls; make transcript APIs throw if called. Test startup/reload/new/resume/fork and no-profile no-op.
+- [x] Write a fake ExtensionAPI test harness recording registrations and UI calls; make transcript APIs throw if called. Test startup/reload/new/resume/fork and no-profile no-op.
 
 ```ts
 expect(ui.setStatus).toHaveBeenCalledWith("pi-profile", "profile: work");
@@ -273,11 +273,11 @@ expect(commands.has("profile")).toBe(true);
 expect(transcriptCalls).toEqual([]);
 ```
 
-- [ ] Run failing extension tests.
-- [ ] Implement with public Pi imports, setting a namespaced status rather than replacing the footer. Build title from sanitized slug and cwd basename. On session_start reapply the label. Guard TUI title updates with mode; do not open prompts during print/json/RPC startup.
-- [ ] `/profile` displays only current profile/root and external switching instructions through supported transient UI. Reject switching arguments; it does not spawn Pi, end the session, inspect credentials or create model messages. Without a profile marker show unprofiled status only when explicitly invoked.
-- [ ] Test coexistence with another status key, safe handling of absent/malformed markers, and package entry loading under native Pi. No timers, filesystem watchers, tool registration, or identity authentication.
-- [ ] Run full verification and commit extension.
+- [x] Run failing extension tests.
+- [x] Implement with public Pi imports, setting a namespaced status rather than replacing the footer. Build title from sanitized slug and cwd basename. On session_start reapply the label. Guard TUI title updates with mode; do not open prompts during print/json/RPC startup.
+- [x] `/profile` displays only current profile/root and external switching instructions through supported transient UI. Reject switching arguments; it does not spawn Pi, end the session, inspect credentials or create model messages. Without a profile marker show unprofiled status only when explicitly invoked.
+- [x] Test coexistence with another status key, safe handling of absent/malformed markers, and package entry loading under native Pi. No timers, filesystem watchers, tool registration, or identity authentication.
+- [x] Run full verification and commit extension.
 
 ## Task 8: End-to-end verification, CI and operating guide
 

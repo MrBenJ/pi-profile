@@ -13,4 +13,14 @@ Evidence is recorded from temporary fixtures only. No real Pi credentials or `~/
 - Result: PASS; Pi reported version `0.85.1` and listed 40 offline catalog rows.
 - Supported baseline: Pi `0.85.1` is verified. Compatibility with later Pi versions is expected through documented public CLI/extension APIs but remains subject to their compatibility.
 
+## Task 6 built launcher smoke
+
+- Built the CLI, created `work` under a temporary HOME, resolved a temporary executable fake Pi from PATH, and launched `work --mode json -- synthetic-prompt`.
+- Result: PASS; captured exact profile root/name, indicator injection, and trailing prompt argument.
+
+## Task 7 native extension smoke
+
+- Ran Pi `0.85.1` offline in RPC/no-session mode with a temporary agent root, synthetic fake auth, and the built extension.
+- Result: PASS; `get_commands` included `/profile` and RPC emitted namespaced `setStatus` with `profile: agent`.
+
 Additional final verification and unverified manual/platform checks are recorded after Task 8.
