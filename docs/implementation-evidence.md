@@ -103,6 +103,15 @@ The orchestrator supplied a new full-branch review; this worker did not delegate
 
 These fixes await the orchestrator’s fresh read-only review; no clean independent verdict is claimed here.
 
+## Round-two acceptance hardening
+
+- Lease inspection now rejects unsafe IDs, symlink/non-file evidence, and filename/content mismatches; it carries canonical paths and exact raw evidence from authoritative directory entries into `show` and cleanup.
+- Stale cleanup renames only the inspected authoritative path, then verifies unchanged raw/id evidence before removal; traversal, wrong-file deletion, and post-inspection mutation regressions pass.
+- macOS/POSIX SIGINT handling uses attached-terminal plus foreground process-group evidence, including a redirected-stdout seam; non-TTY launches continue forwarding SIGINT directly.
+- Production dependency creation is inside `main`'s error boundary; injected cwd-style startup failure returns exit 2 with a diagnostic.
+- A separate no-emit TypeScript project now checks source, tests, and Vitest configuration during `verify`.
+- Calling `setChild()` after release now reports `LEASE_RELEASED` before PID validation.
+
 ## Pi package-directory environment boundary
 
 - Verified against installed Pi `0.85.1` documentation and source before changing policy.
@@ -113,7 +122,7 @@ These fixes await the orchestrator’s fresh read-only review; no clean independ
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
-- `npm run verify`: PASS — 15 test files, 225 tests; TypeScript no-emit check and compiled build passed.
+- `npm run verify`: PASS — 15 test files, 232 tests; production and test-suite TypeScript no-emit checks, tests, and compiled build passed.
 - `npm pack --dry-run`: PASS — package contained only declared runtime/docs files.
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
@@ -121,6 +130,7 @@ These fixes await the orchestrator’s fresh read-only review; no clean independ
 - **Partially retracted round-three smoke:** package/tarball/install/diff checks passed, but `--export=<file>` and prepended-`--offline` help checks did not establish the claimed parser/dispatch behavior. Replacement native parser, argv-zero subcommand, and non-help checks are recorded above.
 - Post-acceptance final smoke: PASS — built-launcher argv-zero auth/uninstall help with subcommand-unique assertions; offline credential-free auth non-help JSON; direct native `parseArgs` supported/equals export semantics; fresh pack; tarball exclusion scan; isolated install/profile creation; and clean diff/status.
 - Post-discovery-fix macOS smoke: PASS — repeated native subcommand help, credential-free auth non-help behavior, direct parser semantics, fresh pack/exclusions, isolated install/profile creation, and clean diff/status after all code commits.
+- Post-hardening macOS package smoke: PASS — fresh prepack/build, tarball exclusion scan, isolated tarball install, packed version, profile creation, and listing. Native Pi parser, argv-zero help, and credential-free auth checks passed as part of the 232-test verification run.
 - `git diff --check`: PASS.
 
 ## Not verified in this environment
