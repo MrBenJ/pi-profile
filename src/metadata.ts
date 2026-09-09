@@ -12,6 +12,7 @@ const reserved = new Set([
   "remove",
   "import",
   "config",
+  "recover",
   "help",
   "version",
 ]);

@@ -10,7 +10,7 @@ const valid = {
   createdAt: "2026-09-09T00:00:00.000Z",
 };
 
-test.each(["../work", "Work", "work/other", "con", "nul", "com1", "create", "a--b", "-a"])(
+test.each(["../work", "Work", "work/other", "con", "nul", "com1", "create", "recover", "a--b", "-a"])(
   "rejects unsafe name %s",
   (name) => expect(() => validateName(name)).toThrow(),
 );

@@ -23,6 +23,7 @@ export type CliCommand =
   | { command: "launch"; profile?: string; cwd?: string; piArgs: string[] }
   | { command: "create"; name?: string }
   | { command: "list" }
+  | { command: "recover" }
   | { command: "show"; name?: string }
   | { command: "rename"; oldName?: string; newName?: string; clearStaleLeases: boolean }
   | { command: "remove"; name?: string; force: boolean; clearStaleLeases: boolean }
@@ -45,7 +46,7 @@ export interface CliDependencies {
   stderr(line: string): void;
 }
 
-const managerCommands = new Set(["create", "list", "show", "rename", "remove", "import", "config"]);
+const managerCommands = new Set(["create", "list", "recover", "show", "rename", "remove", "import", "config"]);
 
 function usage(message: string): never {
   throw new ProfileError("USAGE", message);
@@ -82,6 +83,9 @@ export function parseCli(argv: string[]): CliCommand {
     case "list":
       if (argv.length !== 1) usage("Usage: pi-profile list");
       return { command: "list" };
+    case "recover":
+      if (argv.length !== 1) usage("Usage: pi-profile recover");
+      return { command: "recover" };
     case "show":
       if (argv.length > 2) usage("Usage: pi-profile show <name>");
       return argv[1] ? { command: "show", name: argv[1] } : { command: "show" };
@@ -190,6 +194,11 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       for (const profile of await deps.store.list()) deps.stdout(`${profile.metadata.name}\t${profile.root}`);
       return 0;
     }
+    case "recover": {
+      const result = await deps.store.recover();
+      deps.stdout(`Recovery complete: lock=${result.lockRecovered ? "recovered" : "absent"}, transactions=${result.transactionsRecovered}, stages=${result.stagesRecovered}`);
+      return 0;
+    }
     case "show": {
       const name = await requiredValue(command.name, "Profile name", deps);
       const profile = await deps.store.get(name);
@@ -232,7 +241,6 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
     }
     case "config": {
       const name = await requiredValue(command.name, "Profile name", deps);
-      const profile = await deps.store.get(name);
       let operation = command.operation;
       if (!operation) {
         if (!deps.isTTY) usage("A config operation is required in non-interactive mode");
@@ -246,21 +254,24 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
         }
       }
       if (operation.type === "pi") {
+        const profile = await deps.store.get(name);
         const cwd = await selectWorkingDirectory(profile, undefined, deps.cwd);
         const result = await deps.runPi({ profile, piArgs: ["config"], cwd, env: buildEnvironment(profile, deps.env) });
         return result.code ?? 1;
       }
-      let metadata = profile.metadata;
-      if (operation.type === "default-cwd") metadata = { ...metadata, defaultCwd: expandPath(operation.path, deps) };
-      if (operation.type === "clear-default-cwd") metadata = { ...metadata, defaultCwd: null };
       if (operation.type === "inherit" || operation.type === "no-inherit") {
         validateEnvironmentName(operation.name);
         if (isReservedEnvironmentName(operation.name)) throw new ProfileError("RESERVED_ENVIRONMENT", `${operation.name} is controlled by pi-profile and cannot be inherited`);
-        const names = new Set(metadata.inheritEnvironment);
-        if (operation.type === "inherit") names.add(operation.name); else names.delete(operation.name);
-        metadata = { ...metadata, inheritEnvironment: [...names].sort() };
       }
-      await deps.store.update(name, metadata);
+      const defaultCwd = operation.type === "default-cwd" ? expandPath(operation.path, deps) : undefined;
+      await deps.store.update(name, (metadata) => {
+        if (operation.type === "default-cwd") return { ...metadata, defaultCwd: defaultCwd! };
+        if (operation.type === "clear-default-cwd") return { ...metadata, defaultCwd: null };
+        const names = new Set(metadata.inheritEnvironment);
+        if (operation.type === "inherit") names.add(operation.name);
+        if (operation.type === "no-inherit") names.delete(operation.name);
+        return { ...metadata, inheritEnvironment: [...names].sort() };
+      });
       deps.stdout(`Updated ${name}`);
       return 0;
     }

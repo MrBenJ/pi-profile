@@ -1,10 +1,11 @@
-import { lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { lstat, mkdir, readFile, readdir, rm as removePath, symlink, writeFile } from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { ProfileStore } from "../src/profile-store.js";
 import { acquireLease } from "../src/lease.js";
+import { withMutationLock } from "../src/transactions.js";
 
 let fixture: string;
 let profilesRoot: string;
@@ -51,7 +52,7 @@ describe("ProfileStore", () => {
 
   test("updates and renames metadata without collision", async () => {
     await store.create(metadata("work"));
-    await store.update("work", { ...metadata("work"), defaultCwd: fixture });
+    await store.update("work", (current) => ({ ...current, defaultCwd: fixture }));
     expect((await store.get("work")).metadata.defaultCwd).toBe(fixture);
     await store.rename("work", "office");
     expect((await store.get("office")).metadata.name).toBe("office");
@@ -67,6 +68,43 @@ describe("ProfileStore", () => {
     await lease.release();
     await store.remove("work");
     await expect(store.get("work")).rejects.toThrow();
+  });
+
+  test("reads wait for a healthy in-flight transaction instead of reporting recovery", async () => {
+    await store.create(metadata("work"));
+    let started!: () => void;
+    let finish!: () => void;
+    const startedPromise = new Promise<void>((resolve) => { started = resolve; });
+    const finishPromise = new Promise<void>((resolve) => { finish = resolve; });
+    const journal = join(profilesRoot, ".pi-profile-journal-healthy.json");
+    const mutation = withMutationLock(profilesRoot, async () => {
+      await writeFile(journal, "{}");
+      started();
+      await finishPromise;
+      await removePath(journal);
+    });
+    await startedPromise;
+    const read = store.list();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    finish();
+    await mutation;
+    await expect(read).resolves.toHaveLength(1);
+  });
+
+  test("explicit recovery cleans an interrupted same-host import and its stale lock", async () => {
+    await mkdir(profilesRoot, { recursive: true });
+    const token = "interrupted";
+    const staging = join(profilesRoot, `.pi-profile-create-personal-${token}`);
+    const destination = join(profilesRoot, "personal");
+    await mkdir(staging);
+    const owner = { version: 1, id: token, hostname: hostname(), pid: 2147483647, createdAt: "2026-09-09T00:00:00.000Z" };
+    await writeFile(join(staging, ".pi-profile-stage.json"), JSON.stringify(owner));
+    await writeFile(join(staging, "auth.json"), "opaque-synthetic");
+    await writeFile(join(profilesRoot, ".pi-profile.lock"), JSON.stringify(owner));
+    await writeFile(join(profilesRoot, `.pi-profile-journal-${token}.json`), JSON.stringify({ ...owner, operation: "create", staging, destination }));
+    await expect(store.recover()).resolves.toMatchObject({ lockRecovered: true, transactionsRecovered: 1 });
+    await expect(readFile(join(staging, "auth.json"))).rejects.toThrow();
+    await expect(store.list()).resolves.toEqual([]);
   });
 
   test("concurrent creates publish only one profile", async () => {

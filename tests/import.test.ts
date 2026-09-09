@@ -72,6 +72,18 @@ test("refuses destination collisions and source overlap", async () => {
   await expect(importProfile(new ProfileStore({ profilesRoot: join(source, "profiles"), now: () => new Date() }), "inside", source)).rejects.toThrow(/overlap/i);
 });
 
+test("long copies do not hold the parent mutation lock", async () => {
+  let observed = false;
+  const imported = await importProfile(store, "personal", source, {
+    beforeCopy: async () => {
+      if (observed) return;
+      observed = true;
+      await expect(store.list()).resolves.toEqual([]);
+    },
+  });
+  expect(imported.metadata.name).toBe("personal");
+});
+
 test("mid-copy failure leaves no valid destination", async () => {
   let copies = 0;
   await expect(importProfile(store, "personal", source, {

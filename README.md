@@ -26,6 +26,7 @@ pi-profile work -p "Review this"  # all arguments after profile go to Pi unchang
 pi-profile create [name]
 pi-profile list
 pi-profile show <name>
+pi-profile recover                    # explicit interrupted-operation recovery
 pi-profile rename <old> <new> [--clear-stale-leases]
 pi-profile remove <name> [--force] [--clear-stale-leases]
 pi-profile import <name> <source-directory> [--yes]
@@ -131,7 +132,9 @@ ZAI_CODING_CN_API_KEY
 
 Import is copy-based: the source is never the live profile and is never deleted. Files are copied as opaque bytes through hidden staging. Internal relative symlinks are preserved; absolute, escaping, dangling, and special filesystem entries are rejected. Manager markers, journals, and leases are excluded. Absolute or home-relative external resource/session paths in settings are reported and preserved.
 
-Rename, removal, and metadata updates refuse live or unverifiable leases. A same-host exited lease is stale and requires explicit cleanup confirmation or `--clear-stale-leases` for destructive operations. Another-host and interrupted-start leases are never cleared automatically. If a journal is reported, stop all profile operations and inspect the exact reported paths before manually recovering; never delete a staged directory unless ownership and the retained final/source directory are certain.
+Rename, removal, and metadata updates refuse live or unverifiable leases. A same-host exited lease is stale and requires explicit cleanup confirmation or `--clear-stale-leases` for destructive operations. Another-host and interrupted-start leases are never cleared automatically.
+
+Mutation locks record a random owner id, hostname, PID, and creation time. Normal release verifies that exact owner before unlinking. A crash can leave a lock, journal, or import staging directory; the manager never silently steals it. After confirming the reported process exited, run `pi-profile recover`. Recovery clears only a same-host lock whose PID is provably absent and only transaction/staging paths whose owner metadata agrees. Live PIDs, inaccessible PID state, other-host owners, malformed metadata, rename ambiguity, and paths outside the profile parent remain blocked for manual inspection. Lock wait failures report the observed owner after a bounded five-second wait.
 
 ## Indicator extension
 

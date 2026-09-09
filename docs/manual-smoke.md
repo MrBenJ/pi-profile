@@ -49,6 +49,8 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 - [ ] Terminate a launcher while its child remains alive; confirm rename/removal remain blocked.
 - [ ] Create a same-host stale lease fixture; confirm interactive cleanup asks and scripted cleanup requires `--clear-stale-leases`.
 - [ ] Create an unknown-host lease fixture; confirm it is never cleared automatically.
+- [ ] Interrupt a disposable import process, verify ordinary commands report the lock owner, then run `pi-profile recover`; confirm only same-host/provably-dead owner artifacts are removed.
+- [ ] Attempt recovery with a live PID, inaccessible PID state, malformed owner, and another hostname; confirm every case remains blocked and unchanged.
 - [ ] Run `/profile`; confirm it displays only name/root and cannot switch profiles.
 
 ## Windows-specific

@@ -5,7 +5,7 @@ import { ProfileError } from "./contracts.js";
 import type { ProfileStore } from "./profile-store.js";
 import { validateName } from "./metadata.js";
 
-const excludedNames = new Set([".pi-profile.json", ".pi-profile-leases"]);
+const excludedNames = new Set([".pi-profile.json", ".pi-profile-leases", ".pi-profile-stage.json"]);
 const resourceKeys = new Set(["extensions", "skills", "prompts", "themes", "packages", "source", "sessionDir"]);
 
 function isContained(parent: string, candidate: string): boolean {

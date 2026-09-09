@@ -45,6 +45,7 @@ describe("parseCli", () => {
   test.each([
     [["create", "work"], { command: "create", name: "work" }],
     [["list"], { command: "list" }],
+    [["recover"], { command: "recover" }],
     [["show", "work"], { command: "show", name: "work" }],
     [["rename", "work", "office", "--clear-stale-leases"], { command: "rename", oldName: "work", newName: "office", clearStaleLeases: true }],
     [["remove", "work", "--force"], { command: "remove", name: "work", force: true, clearStaleLeases: false }],
@@ -79,6 +80,20 @@ test("import reports scope and requires yes noninteractively", async () => {
   expect(imported).toEqual([]);
   expect(await main(["import", "personal", fixture, "--yes"], deps)).toBe(0);
   expect(stdout.join("\n")).toContain("/shared/extension.ts");
+});
+
+test("explicit recover command invokes conservative store recovery", async () => {
+  expect(await main(["recover"], deps)).toBe(0);
+  expect(stdout.join("\n")).toContain("Recovery complete");
+});
+
+test("concurrent inherited-name config updates retain both changes", async () => {
+  await create("work");
+  expect(await Promise.all([
+    main(["config", "work", "--inherit", "FIRST_KEY"], deps),
+    main(["config", "work", "--inherit", "SECOND_KEY"], deps),
+  ])).toEqual([0, 0]);
+  expect((await store.get("work")).metadata.inheritEnvironment).toEqual(["FIRST_KEY", "SECOND_KEY"]);
 });
 
 test("config edits metadata and native pi config launches under the profile", async () => {
