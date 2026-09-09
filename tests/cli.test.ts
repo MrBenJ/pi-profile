@@ -71,6 +71,7 @@ test("--cwd before a manager command reports a clear usage error", () => {
 test("help and version are usable without profiles", async () => {
   expect(await main(["--help"], deps)).toBe(0);
   expect(stdout.join("\n")).toContain("Usage: pi-profile");
+  expect(stdout.join("\n")).toContain("--clear-stale-leases");
   stdout = [];
   expect(await main(["--version"], deps)).toBe(0);
   expect(stdout).toEqual(["0.1.0"]);

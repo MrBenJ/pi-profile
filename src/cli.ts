@@ -20,8 +20,10 @@ Commands:
   list                                  List profiles
   show <name>                           Show non-secret profile metadata
   recover                               Recover verified stale manager artifacts
-  rename <old> <new>                    Rename an inactive profile
-  remove <name> [--force]               Remove an inactive profile
+  rename <old> <new> [--clear-stale-leases]
+                                          Rename an inactive profile
+  remove <name> [--force] [--clear-stale-leases]
+                                          Remove an inactive profile
   import <name> <source> [--yes]        Copy an existing Pi configuration
   config <name> <operation>             Configure profile metadata or run Pi config
 

@@ -40,6 +40,7 @@ test.each([
   [["list"], "management"],
   [["auth", "status"], "management"],
   [["--offline", "auth", "--help"], "management"],
+  [["--export=transcript.html"], "management"],
   [["--provider", "auth", "hello"], "session"],
   [["-p", "auth"], "session"],
   [["--mode", "json", "hello"], "session"],

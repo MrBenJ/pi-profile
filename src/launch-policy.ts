@@ -23,6 +23,7 @@ export function classifyInvocation(args: string[]): InvocationKind {
     if (managementExitFlags.has(argument)) return "management";
     if (!argument.startsWith("-")) return "session";
     const option = argument.includes("=") ? argument.slice(0, argument.indexOf("=")) : argument;
+    if (option === "--export" && argument.includes("=")) return "management";
     if (sessionForcingFlags.has(option)) return "session";
     if (!argument.includes("=") && optionsWithValues.has(option)) index += 1;
   }
