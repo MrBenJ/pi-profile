@@ -4,11 +4,12 @@ import type { LaunchRequest, Profile } from "./contracts.js";
 import { ProfileError } from "./contracts.js";
 
 const managementCommands = new Set(["config", "install", "remove", "uninstall", "list", "update", "auth"]);
-const managementExitFlags = new Set(["--help", "-h", "--version", "-v", "--list-models", "--export"]);
+const managementExitFlags = new Set(["--help", "-h", "--version", "-v", "--list-models"]);
 export type InvocationKind = "session" | "management";
 
 export function classifyInvocation(args: string[]): InvocationKind {
   const first = args[0];
+  if (first === "--export") return args.length > 1 ? "management" : "session";
   if (first && (managementCommands.has(first) || managementExitFlags.has(first))) return "management";
   return "session";
 }

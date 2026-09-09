@@ -45,6 +45,7 @@ test.each([
   [["--provider", "auth", "hello"], "session"],
   [["-p", "auth"], "session"],
   [["--mode", "json", "hello"], "session"],
+  [["--export"], "session"],
   [["--export", "transcript.jsonl"], "management"],
   [["--", "auth"], "session"],
 ] as const)("classifies %j as %s", (args, expected) => expect(classifyInvocation([...args])).toBe(expected));

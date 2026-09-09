@@ -1,10 +1,11 @@
+import { parseArgs } from "@earendil-works/pi-coding-agent";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { buildEnvironment } from "../src/environment.js";
 import { acquireLease, inspectLeases } from "../src/lease.js";
-import { runPi, resolvePi, terminalBroadcastsInterrupt } from "../src/process.js";
+import { runPi, resolvePi, sessionArguments, terminalBroadcastsInterrupt } from "../src/process.js";
 import { ProfileStore } from "../src/profile-store.js";
 import type { LaunchRequest, Profile } from "../src/contracts.js";
 
@@ -67,7 +68,20 @@ test("terminal SIGINT detection survives redirected stdout and preserves non-TTY
   expect(terminalBroadcastsInterrupt({ stdin: true, stdout: false, stderr: true }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(true);
   expect(terminalBroadcastsInterrupt({ stdin: true, stdout: false, stderr: false }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(true);
   expect(terminalBroadcastsInterrupt({ stdin: true, stdout: false, stderr: true }, "darwin", { processGroup: 42, terminalForegroundGroup: 99 })).toBe(false);
-  expect(terminalBroadcastsInterrupt({ stdin: false, stdout: false, stderr: false }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(false);
+  expect(terminalBroadcastsInterrupt({ stdin: false, stdout: false, stderr: false }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(true);
+  expect(terminalBroadcastsInterrupt({ stdin: false, stdout: false, stderr: false }, "darwin", { processGroup: 42, terminalForegroundGroup: 99 })).toBe(false);
+});
+
+test("bare export remains a session while export with a value exits natively", () => {
+  const bare = parseArgs(["--export"]);
+  expect(bare.export).toBeUndefined();
+  expect(bare.unknownFlags.get("export")).toBe(true);
+  expect(sessionArguments(["--export"])[0]).toBe("--extension");
+
+  const valid = parseArgs(["--export", "session.html"]);
+  expect(valid.export).toBe("session.html");
+  expect(valid.unknownFlags.size).toBe(0);
+  expect(sessionArguments(["--export", "session.html"])).toEqual(["--export", "session.html"]);
 });
 
 test("SIGINT waits for a synthetic child and releases its lease", async () => {
@@ -99,11 +113,14 @@ test("releases its own lease when publication fails and child exit is proven", a
 
 test("retains actionable lease evidence when publication failure child exit is unproven", async () => {
   let retained: Awaited<ReturnType<typeof acquireLease>> | undefined;
+  let retainedPath = "";
   const leaseFactory = async (selected: Profile) => {
     const lease = await acquireLease(selected);
     retained = lease;
+    retainedPath = join(selected.root, "retained-authoritative", `${lease.lease.id}.json`);
     return {
       ...lease,
+      path: retainedPath,
       setChild: async () => {
         for (let attempt = 0; attempt < 100; attempt += 1) {
           try { await access(capture); break; } catch { await new Promise((resolve) => setTimeout(resolve, 5)); }
@@ -121,6 +138,7 @@ test("retains actionable lease evidence when publication failure child exit is u
   }
   expect(failure?.message).toMatch(/could not be confirmed.*manually remov/i);
   expect(failure?.message).toContain(retained!.lease.id);
+  expect(failure?.message).toContain(retainedPath);
   expect((await inspectLeases(profile)).active).toHaveLength(1);
   const child = JSON.parse(await readFile(capture, "utf8")) as { pid: number };
   process.kill(child.pid, "SIGKILL");
@@ -134,6 +152,7 @@ test.each([
   const warnings: string[] = [];
   const leaseFactory = async () => ({
     lease: { version: 1 as const, id: "cleanup", hostname: "test", launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "starting" as const },
+    path: join(profile.root, ".pi-profile-leases", "cleanup.json"),
     setChild: async () => undefined,
     release: async () => { throw new Error("injected release failure"); },
   });
@@ -147,6 +166,7 @@ test("preserves signaled child outcome when lease cleanup fails", async () => {
   const warnings: string[] = [];
   const leaseFactory = async () => ({
     lease: { version: 1 as const, id: "cleanup", hostname: "test", launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "starting" as const },
+    path: join(profile.root, ".pi-profile-leases", "cleanup.json"),
     setChild: async () => undefined,
     release: async () => { throw new Error("injected release failure"); },
   });
@@ -157,6 +177,7 @@ test("preserves signaled child outcome when lease cleanup fails", async () => {
 test("preserves publication failure as primary when lease cleanup also fails", async () => {
   const primaryLease = {
     lease: { version: 1 as const, id: "cleanup", hostname: "test", launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "starting" as const },
+    path: join(profile.root, ".pi-profile-leases", "cleanup.json"),
     setChild: async () => { throw new Error("injected publication failure"); },
     release: async () => { throw new Error("injected release failure"); },
   };

@@ -6,7 +6,7 @@ import type { Lease, Profile } from "./contracts.js";
 import { ProfileError } from "./contracts.js";
 import { atomicWriteJson, withMutationLock } from "./transactions.js";
 
-const LEASE_DIRECTORY = ".pi-profile-leases";
+export const LEASE_DIRECTORY = ".pi-profile-leases";
 const LEASE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
 export interface LeaseEvidence extends Lease {
@@ -136,6 +136,7 @@ export async function clearStaleLeases(
 
 export async function acquireLease(profile: Profile): Promise<{
   lease: Lease;
+  path: string;
   setChild(pid: number): Promise<void>;
   release(): Promise<void>;
 }> {
@@ -168,6 +169,7 @@ export async function acquireLease(profile: Profile): Promise<{
     let released = false;
     return {
       lease,
+      path,
       async setChild(pid: number) {
         if (released) throw new ProfileError("LEASE_RELEASED", "Cannot publish a child PID after this launch lease was released");
         if (!Number.isSafeInteger(pid) || pid <= 0) throw new ProfileError("INVALID_CHILD_PID", "Cannot publish invalid child PID");

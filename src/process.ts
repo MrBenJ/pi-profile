@@ -79,9 +79,10 @@ export function terminalBroadcastsInterrupt(
   platform: NodeJS.Platform = process.platform,
   groups?: { processGroup: number; terminalForegroundGroup: number },
 ): boolean {
-  if (!(streams.stdin || streams.stdout || streams.stderr)) return false;
-  if (platform === "win32" || !groups) return true;
-  return groups.processGroup > 0 && groups.processGroup === groups.terminalForegroundGroup;
+  if (platform !== "win32" && groups) {
+    return groups.processGroup > 0 && groups.processGroup === groups.terminalForegroundGroup;
+  }
+  return streams.stdin || streams.stdout || streams.stderr;
 }
 
 function foregroundGroups(platform: NodeJS.Platform): { processGroup: number; terminalForegroundGroup: number } | undefined {
@@ -97,7 +98,7 @@ function foregroundGroups(platform: NodeJS.Platform): { processGroup: number; te
   }
 }
 
-function sessionArguments(piArgs: string[]): string[] {
+export function sessionArguments(piArgs: string[]): string[] {
   if (classifyInvocation(piArgs) === "management") return [...piArgs];
   return ["--extension", indicatorEntrypoint, ...piArgs];
 }
@@ -191,10 +192,9 @@ export async function runPi(
           throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; child exit was confirmed and this launcher's lease was released: ${(error as Error).message}`);
         }
         retainLease = true;
-        const leasePath = join(request.profile.root, ".pi-profile-leases", `${owner.lease.id}.json`);
         throw new ProfileError(
           "LEASE_PUBLICATION_UNCERTAIN",
-          `Pi started but its child lease could not be recorded and child exit could not be confirmed. Evidence was retained at ${leasePath}; verify child PID ${child.pid} is gone before manually removing that exact lease file: ${(error as Error).message}`,
+          `Pi started but its child lease could not be recorded and child exit could not be confirmed. Evidence was retained at ${owner.path}; verify child PID ${child.pid} is gone before manually removing that exact lease file: ${(error as Error).message}`,
         );
       }
       result = await outcome;
