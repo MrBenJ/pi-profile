@@ -29,6 +29,26 @@ describe("ProfileStore", () => {
     expect((await store.get("work")).root).toBe(join(profilesRoot, "work"));
   });
 
+  test("discovers healthy profiles beside invalid roots without weakening direct operations", async () => {
+    await store.create(metadata("healthy"));
+    const invalid = ["missing-marker", "malformed", "future"];
+    for (const name of invalid) await mkdir(join(profilesRoot, name));
+    await writeFile(join(profilesRoot, "malformed", ".pi-profile.json"), "{not-json");
+    await writeFile(join(profilesRoot, "future", ".pi-profile.json"), JSON.stringify({ ...metadata("future"), version: 2 }));
+
+    await expect(store.list()).resolves.toMatchObject([{ metadata: { name: "healthy" } }]);
+    const discovery = await store.discover();
+    expect(discovery.profiles.map((profile) => profile.metadata.name)).toEqual(["healthy"]);
+    expect(discovery.diagnostics).toHaveLength(3);
+    for (const name of invalid) {
+      expect(discovery.diagnostics.some((diagnostic) => diagnostic.root === join(profilesRoot, name) && /inspect.*manually/i.test(diagnostic.message))).toBe(true);
+      await expect(store.get(name)).rejects.toThrow();
+      await expect(store.rename(name, `${name}-new`)).rejects.toThrow();
+      await expect(store.remove(name)).rejects.toThrow();
+      await expect(lstat(join(profilesRoot, name))).resolves.toBeDefined();
+    }
+  });
+
   test("uses restrictive POSIX modes", async () => {
     const profile = await store.create(metadata("work"));
     if (process.platform !== "win32") {

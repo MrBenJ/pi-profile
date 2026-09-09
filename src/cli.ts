@@ -188,11 +188,17 @@ function mappedExitStatus(result: { code: number | null; signal: NodeJS.Signals 
   return result.signal ? 128 + (osConstants.signals[result.signal] ?? 0) : 1;
 }
 
+async function discoverProfiles(deps: CliDependencies): Promise<Profile[]> {
+  const discovery = await deps.store.discover();
+  for (const diagnostic of discovery.diagnostics) deps.stderr(`pi-profile: ${diagnostic.message}`);
+  return discovery.profiles;
+}
+
 async function launchProfile(command: Extract<CliCommand, { command: "launch" }>, deps: CliDependencies): Promise<number> {
   let name = command.profile;
   if (!name) {
     if (!deps.isTTY) usage("A profile name is required in non-interactive mode");
-    const profiles = await deps.store.list();
+    const profiles = await discoverProfiles(deps);
     if (!profiles.length) throw new ProfileError("NO_PROFILES", "No profiles exist; run pi-profile create <name>");
     name = await deps.select("Select a Pi profile:", profiles.map((profile) => profile.metadata.name));
     if (!name) {
@@ -240,7 +246,7 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       return 0;
     }
     case "list": {
-      for (const profile of await deps.store.list()) deps.stdout(`${profile.metadata.name}\t${profile.root}`);
+      for (const profile of await discoverProfiles(deps)) deps.stdout(`${profile.metadata.name}\t${profile.root}`);
       return 0;
     }
     case "recover": {

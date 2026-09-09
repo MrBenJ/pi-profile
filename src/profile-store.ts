@@ -21,6 +21,17 @@ const MARKER = ".pi-profile.json";
 const STAGE_MARKER = ".pi-profile-stage.json";
 const JOURNAL_PREFIX = ".pi-profile-journal-";
 
+export interface ProfileDiscoveryDiagnostic {
+  root: string;
+  code: string;
+  message: string;
+}
+
+export interface ProfileDiscovery {
+  profiles: Profile[];
+  diagnostics: ProfileDiscoveryDiagnostic[];
+}
+
 async function pathKind(path: string): Promise<"missing" | "directory" | "file" | "symlink"> {
   try {
     const stat = await lstat(path);
@@ -112,30 +123,38 @@ export class ProfileStore {
   }
 
   async list(): Promise<Profile[]> {
-    try {
-      return await withMutationLock(this.profilesRoot, async () => {
-        await this.assertNoUncertainJournalUnlocked();
-        return this.listUnlocked();
-      });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-      throw error;
-    }
+    return (await this.discover()).profiles;
   }
 
-  private async listUnlocked(): Promise<Profile[]> {
+  async discover(): Promise<ProfileDiscovery> {
+    return withMutationLock(this.profilesRoot, async () => {
+      await this.assertNoUncertainJournalUnlocked();
+      return this.discoverUnlocked();
+    });
+  }
+
+  private async discoverUnlocked(): Promise<ProfileDiscovery> {
     const entries = await readdir(this.profilesRoot, { withFileTypes: true });
     const profiles: Profile[] = [];
+    const diagnostics: ProfileDiscoveryDiagnostic[] = [];
     for (const entry of entries) {
       if (entry.name.startsWith(".") || !entry.isDirectory() || entry.isSymbolicLink()) continue;
+      const root = join(this.profilesRoot, entry.name);
       try {
         profiles.push(await this.getUnlocked(entry.name));
       } catch (error) {
-        if (error instanceof ProfileError && error.code === "INVALID_NAME") continue;
-        throw error;
+        const code = error instanceof ProfileError ? error.code : (error as NodeJS.ErrnoException).code ?? "PROFILE_UNREADABLE";
+        const reason = error instanceof Error ? error.message : String(error);
+        diagnostics.push({
+          root,
+          code,
+          message: `Ignored invalid profile candidate ${root}: ${reason}. Inspect it manually; pi-profile will not delete or mutate this directory automatically.`,
+        });
       }
     }
-    return profiles.sort((a, b) => a.metadata.name.localeCompare(b.metadata.name));
+    profiles.sort((a, b) => a.metadata.name.localeCompare(b.metadata.name));
+    diagnostics.sort((a, b) => a.root.localeCompare(b.root));
+    return { profiles, diagnostics };
   }
 
   async get(name: string): Promise<Profile> {

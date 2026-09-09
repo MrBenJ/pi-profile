@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -84,6 +84,24 @@ test("create, list, show, and rename avoid secret-bearing contents", async () =>
   expect(stdout.join("\n")).not.toContain("auth.json");
   expect(await main(["rename", "work", "office"], deps)).toBe(0);
   expect((await store.get("office")).metadata.name).toBe("office");
+});
+
+test("list and picker report invalid roots while preserving healthy profiles", async () => {
+  await create("healthy");
+  const broken = join(store.profilesRoot, "broken");
+  await mkdir(broken);
+  await writeFile(join(broken, ".pi-profile.json"), "{bad-json");
+  expect(await main(["list"], deps)).toBe(0);
+  expect(stdout.join("\n")).toContain("healthy");
+  expect(stderr.join("\n")).toContain(broken);
+  expect(stderr.join("\n")).toMatch(/inspect.*manually/i);
+
+  let choices: string[] = [];
+  deps = { ...deps, isTTY: true, select: async (_title, values) => { choices = values; return "healthy"; } };
+  expect(await main([], deps)).toBe(0);
+  expect(choices).toEqual(["healthy"]);
+  expect(launched).toHaveLength(1);
+  await expect(writeFile(join(broken, "still-present"), "yes")).resolves.toBeUndefined();
 });
 
 test("remove requires exact typed confirmation unless forced", async () => {
