@@ -68,6 +68,16 @@ test("--cwd before a manager command reports a clear usage error", () => {
   expect(() => parseCli([`--cwd=${fixture}`, "recover"])).toThrow(/--cwd.*profile.*management/i);
 });
 
+test("production dependency construction failures are contained by main", async () => {
+  const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  try {
+    await expect(main(["--help"], undefined, () => { throw Object.assign(new Error("cwd is unavailable"), { code: "ENOENT" }); })).resolves.toBe(2);
+    expect(write.mock.calls.flat().join("")).toContain("cwd is unavailable");
+  } finally {
+    write.mockRestore();
+  }
+});
+
 test("help and version are usable without profiles", async () => {
   expect(await main(["--help"], deps)).toBe(0);
   expect(stdout.join("\n")).toContain("Usage: pi-profile");

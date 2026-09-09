@@ -385,13 +385,19 @@ function productionDependencies(): CliDependencies {
   };
 }
 
-export async function main(argv: string[], dependencies?: CliDependencies): Promise<number> {
-  const deps = dependencies ?? productionDependencies();
+export async function main(
+  argv: string[],
+  dependencies?: CliDependencies,
+  dependencyFactory: () => CliDependencies = productionDependencies,
+): Promise<number> {
+  let deps = dependencies;
   try {
+    deps ??= dependencyFactory();
     return await dispatch(parseCli(argv), deps);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    deps.stderr(`pi-profile: ${message}`);
+    if (deps) deps.stderr(`pi-profile: ${message}`);
+    else process.stderr.write(`pi-profile: ${message}\n`);
     return error instanceof ProfileError && error.code === "CANCELLED" ? 1 : 2;
   }
 }
