@@ -148,7 +148,7 @@ const device = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 **Consumes:** `StoreOptions`, `Profile`, metadata and path validators.
 **Produces:** `ProfileStore` with `create(metadata): Promise<Profile>`, `list(): Promise<Profile[]>`, `get(name): Promise<Profile>`, `update(name, metadata): Promise<void>`, `rename(oldName,newName): Promise<void>`, `remove(name): Promise<void>`. `acquireLease(profile): Promise<{lease: Lease; setChild(pid:number): Promise<void>; release(): Promise<void>}>`.
 
-- [ ] Write filesystem tests for create/list/get, invalid markers, symlinked root/marker refusal, collisions and rename/remove while a lease is live. Use real filesystem operations in the temp store, not all mocked fs calls.
+- [x] Write filesystem tests for create/list/get, invalid markers, symlinked root/marker refusal, collisions and rename/remove while a lease is live. Use real filesystem operations in the temp store, not all mocked fs calls.
 
 ```ts
 const store = new ProfileStore({ profilesRoot: tempRoot, now: () => new Date("2026-09-09T00:00:00Z") });
@@ -159,11 +159,11 @@ await lease.release();
 expect((await store.get("work")).root).toBe(work.root);
 ```
 
-- [ ] Run failing tests, then implement an exclusive mutation lock under the stable parent, not inside a directory being renamed. Lease acquisition and destructive operations use the same lock so launch cannot race a successful emptiness check. A lock acquisition failure is a bounded actionable error, never a spin forever.
-- [ ] Stage create/rename updates in hidden sibling directories with owner tokens and a journal. Publish by rename without overwriting an existing destination. Rollback restores old marker/name; an uncertain journal blocks launch until explicit recovery, never deletes user data.
-- [ ] Store launcher and child PIDs before releasing the mutation lock around startup. Refuse destruction if either is live, PID identity is ambiguous, hostname differs, or startup was interrupted before child PID recording. Never call a missing launcher PID sufficient evidence of inactivity.
-- [ ] Test concurrent create of the same slug, launch-vs-remove interleaving, live child after launcher loss, stale unknown-host lease, injected failure between staging and promotion, and symlinks inside a removed profile. Removal unlinks links and does not traverse their targets. POSIX assertions cover 0700 directories/0600 metadata; Windows path safety still runs.
-- [ ] Run all tests/typecheck and commit store/transaction/lease changes.
+- [x] Run failing tests, then implement an exclusive mutation lock under the stable parent, not inside a directory being renamed. Lease acquisition and destructive operations use the same lock so launch cannot race a successful emptiness check. A lock acquisition failure is a bounded actionable error, never a spin forever.
+- [x] Stage create/rename updates in hidden sibling directories with owner tokens and a journal. Publish by rename without overwriting an existing destination. Rollback restores old marker/name; an uncertain journal blocks launch until explicit recovery, never deletes user data.
+- [x] Store launcher and child PIDs before releasing the mutation lock around startup. Refuse destruction if either is live, PID identity is ambiguous, hostname differs, or startup was interrupted before child PID recording. Never call a missing launcher PID sufficient evidence of inactivity.
+- [x] Test concurrent create of the same slug, launch-vs-remove interleaving, live child after launcher loss, stale unknown-host lease, injected failure between staging and promotion, and symlinks inside a removed profile. Removal unlinks links and does not traverse their targets. POSIX assertions cover 0700 directories/0600 metadata; Windows path safety still runs.
+- [x] Run all tests/typecheck and commit store/transaction/lease changes.
 
 ## Task 3: Atomic explicit import
 
