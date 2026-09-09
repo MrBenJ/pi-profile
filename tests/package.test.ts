@@ -21,6 +21,8 @@ describe("package manifest", () => {
     expect(pkg.files).not.toContain("tests");
     expect(pkg.files).not.toContain(".worktrees");
     expect(pkg.scripts.prepack).toBe("npm run build");
+    expect(pkg.scripts["typecheck:tests"]).toBe("tsc -p tsconfig.tests.json --noEmit");
+    expect(pkg.scripts.verify).toContain("typecheck:tests");
   });
 
   test("ignores interrupted fresh-pack fixtures", async () => {

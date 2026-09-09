@@ -44,7 +44,7 @@ test("registers a read-only profile command using transient UI", async () => {
   expect(commands.has("profile")).toBe(true);
   await commands.get("profile")?.handler("", ctx);
   expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("work"), "info");
-  expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining(process.env.PI_CODING_AGENT_DIR), "info");
+  expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining(process.env.PI_CODING_AGENT_DIR!), "info");
   await commands.get("profile")?.handler("personal", ctx);
   expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("cannot switch"), "warning");
 });

@@ -34,8 +34,9 @@
     "build": "tsc",
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm test && npm run build"
+    "verify": "npm run typecheck && npm run typecheck:tests && npm test && npm run build"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
