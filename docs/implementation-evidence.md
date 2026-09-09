@@ -31,6 +31,8 @@ Evidence is recorded from temporary fixtures only. No real Pi credentials or `~/
 
 ## Independent review round 1 fixes
 
+Result accounting: **8 findings fixed, 0 deferred**.
+
 Claude Opus reviewed the branch read-only. The implementation worker did not spawn a reviewer. All eight reported items received regressions and fixes:
 
 - stale mutation locks now carry owner id/hostname/PID/time, normal release verifies ownership, and explicit `pi-profile recover` refuses live, unknown, remote, malformed, or path-ambiguous state;
@@ -47,6 +49,8 @@ Native built-CLI checks: PASS — `pi-profile work --offline auth --help` and `u
 
 ## Independent review round 2 fixes
 
+Result accounting: **8 findings fixed, 0 deferred**.
+
 Claude Opus performed a second full-feature read-only review. No further reviewer was delegated. Every reported item received a regression and fix:
 
 - rename journals now validate stale ownership, journal filename, metadata, exact source/staging/destination paths, and names before mutation; sole-source, sole-staging, and sole-committed-destination crash windows recover deterministically, while collisions and unsafe paths remain untouched;
@@ -57,10 +61,25 @@ Claude Opus performed a second full-feature read-only review. No further reviewe
 - SIGINT handling waits for/reaps the child and releases its lease, forwarding only for non-terminal single-process signals to avoid duplicate terminal delivery;
 - `--cwd` before a manager command reports targeted usage, and normal launch plus `config --pi` share signal exit mapping.
 
+## Independent review round 3 fixes
+
+Result accounting: **1 major fixed, 5 minor addressed (3 code fixes, 1 documented behavior, 1 cleanup implementation deferred with safety rationale), and 2 nits fixed**. The three-round cap is reached.
+
+- **MAJOR fixed:** Windows `resolvePi()` now probes both the global npm layout (`<PATH>/node_modules/@earendil-works/.../cli.js`) and local project layout (`node_modules/.bin/../@earendil-works/.../cli.js`), returning `process.execPath` plus the bundle argument with `shell: false`. Platform-injected tests cover both layouts.
+- **MINOR fixed:** lease parsing requires positive safe-integer launcher and child PIDs.
+- **MINOR fixed:** child outcome rejection handling is attached immediately; lease-publication failure sends termination, drains/reaps the child, and retains the conservative lease evidence.
+- **MINOR fixed:** create failures after destination promotion now return `CREATE_COMMITTED_CLEANUP_PENDING`, preserve the journal, and direct the next invocation to recovery instead of implying creation failed.
+- **MINOR documented behavior:** `defaultCwd` deliberately permits currently nonexistent removable/network/future paths; the effective directory is validated immediately before every launch, matching the approved specification.
+- **MINOR deferred cleanup:** crash-left `.pi-profile.lock.release-*` and atomic `.*.tmp` artifacts are harmless and nonblocking. Automatic deletion is deferred because provenance cannot always be proven and broad cleanup could remove another owner's evidence. README/manual recovery guidance now states this limitation.
+- **NIT fixed:** help lists `--clear-stale-leases` for rename and removal.
+- **NIT fixed after native verification:** Pi 0.85.1 accepts `--export=<file>` (offline `--help` exited 0); classification recognizes that exact form without rewriting argv.
+
+The latest independent review verdict contains the findings above and predates these fixes. Per the requested cap, no fourth reviewer was launched, so there is **no post-fix clean independent verdict**.
+
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
-- `npm run verify`: PASS — 15 test files, 197 tests; TypeScript no-emit check and compiled build passed.
+- `npm run verify`: PASS — 15 test files, 208 tests; TypeScript no-emit check and compiled build passed.
 - `npm pack --dry-run`: PASS — package contained only declared runtime/docs files.
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
@@ -73,4 +92,4 @@ Claude Opus performed a second full-feature read-only review. No further reviewe
 - Real OAuth/API-key login, logout, refresh, provider account crossover, and cloud SDK default-file/metadata authentication were not tested. Those require user-controlled disposable accounts and may access networks.
 - Interactive TUI footer/title appearance, concurrent human TUI sessions, and manual trust/model/session selectors were not visually verified; RPC and extension harness behavior passed.
 - Destructive recovery from a real crash, PID reuse, unknown-host leases, and journal recovery were tested through synthetic interrupted state where automated, not through destructive host-level fault injection.
-- Independent read-only review rounds 1 and 2 completed; orchestrator round 3 is pending. No nested reviewer was launched by this worker.
+- Independent read-only review rounds 1–3 completed and the review cap was reached. Round-three fixes have no subsequent clean independent verdict. No nested reviewer was launched by this worker.

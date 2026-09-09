@@ -18,6 +18,7 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 - [ ] On Windows with Developer Mode, import a relative directory symlink, rename the profile, and confirm the link remains relative and usable; with symlink privilege disabled, confirm import reports the required permission instead of creating a junction.
 - [ ] Run `pi-profile create work`.
 - [ ] Set different default directories and run `pi-profile config <name> --pi` for both profiles.
+- [ ] Configure a currently missing removable/network path as `defaultCwd`; confirm configuration succeeds but launch reports the missing directory until it becomes available.
 
 ## Real provider accounts (user-only)
 
@@ -53,11 +54,12 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 - [ ] Interrupt a disposable import process, verify ordinary commands report the lock owner, then run `pi-profile recover`; confirm only same-host/provably-dead owner artifacts are removed.
 - [ ] Interrupt rename before moving the source, while staged, and after destination promotion; confirm recovery respectively restores source metadata, moves staging back to source, or verifies the committed destination. Add a collision and confirm recovery changes nothing.
 - [ ] Attempt recovery with a live PID, inaccessible PID state, malformed owner, and another hostname; confirm every case remains blocked and unchanged.
+- [ ] If crash testing leaves `.pi-profile.lock.release-*` or atomic `.*.tmp` files, confirm normal operations remain unblocked and only remove them manually after proving provenance.
 - [ ] Run `/profile`; confirm it displays only name/root and cannot switch profiles.
 
 ## Windows-specific
 
-- [ ] Verify npm's `pi.cmd` resolves to the installed Node CLI without `shell:true`.
+- [ ] Verify both global `<bin>/node_modules/.../cli.js` and local `node_modules/.bin/../@earendil-works/.../cli.js` npm `pi.cmd` layouts resolve to the installed Node CLI without `shell:true`.
 - [ ] Test spaces, metacharacters, and Unicode in profile cwd and Pi arguments.
 - [ ] Test Ctrl+C from Windows Terminal and confirm Pi receives one terminal interrupt, the launcher waits for it to exit, and the lease is removed; retain conservative evidence if the child survives.
 - [ ] Confirm path/device-name validation and normal current-user ACL behavior.
