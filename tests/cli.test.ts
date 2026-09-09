@@ -1,5 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { main, parseCli, type CliDependencies } from "../src/cli.js";
@@ -102,6 +102,30 @@ test("list and picker report invalid roots while preserving healthy profiles", a
   expect(choices).toEqual(["healthy"]);
   expect(launched).toHaveLength(1);
   await expect(writeFile(join(broken, "still-present"), "yes")).resolves.toBeUndefined();
+});
+
+test("show reports exact ambiguous lease evidence and manual guidance", async () => {
+  const profile = await create("work");
+  const leases = join(profile.root, ".pi-profile-leases");
+  await mkdir(leases);
+  const leasePath = join(leases, "starting.json");
+  await writeFile(leasePath, JSON.stringify({ version: 1, id: "starting", hostname: hostname(), launcherPid: 2147483647, childPid: null, createdAt: new Date().toISOString(), state: "starting" }));
+  expect(await main(["show", "work"], deps)).toBe(0);
+  expect(stdout.join("\n")).toContain(leasePath);
+  expect(stdout.join("\n")).toContain("starting");
+  expect(stdout.join("\n")).toMatch(/inspect.*manually/i);
+});
+
+test("corrupt lease show failure names the retained file and manual safety rule", async () => {
+  const profile = await create("work");
+  const leases = join(profile.root, ".pi-profile-leases");
+  await mkdir(leases);
+  const leasePath = join(leases, "corrupt.json");
+  await writeFile(leasePath, "{broken");
+  expect(await main(["show", "work"], deps)).toBe(2);
+  expect(stderr.join("\n")).toContain(leasePath);
+  expect(stderr.join("\n")).toMatch(/inspect.*manually.*do not remove/i);
+  expect(await readFile(leasePath, "utf8")).toBe("{broken");
 });
 
 test("remove requires exact typed confirmation unless forced", async () => {

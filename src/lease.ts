@@ -53,7 +53,8 @@ export async function inspectLeases(profile: Profile): Promise<LeaseInspection> 
     try {
       lease = parseLease(JSON.parse(await readFile(join(directory, entry), "utf8")));
     } catch {
-      throw new ProfileError("INVALID_LEASE", `Cannot safely inspect lease: ${join(directory, entry)}`);
+      const path = join(directory, entry);
+      throw new ProfileError("INVALID_LEASE", `Cannot safely inspect lease: ${path}. Inspect it manually; do not remove it unless every recorded process is proven absent.`);
     }
     if (lease.hostname !== hostname()) {
       result.ambiguous.push(lease);

@@ -258,7 +258,31 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       const name = await requiredValue(command.name, "Profile name", deps);
       const profile = await deps.store.get(name);
       const leases = await inspectLeases(profile);
-      deps.stdout(JSON.stringify({ name: profile.metadata.name, root: profile.root, defaultCwd: profile.metadata.defaultCwd, inheritEnvironment: profile.metadata.inheritEnvironment, leases: { active: leases.active.length, ambiguous: leases.ambiguous.length, stale: leases.stale.length } }, null, 2));
+      const describeLease = (lease: (typeof leases.active)[number]) => ({
+        id: lease.id,
+        path: join(profile.root, ".pi-profile-leases", `${lease.id}.json`),
+        hostname: lease.hostname,
+        launcherPid: lease.launcherPid,
+        childPid: lease.childPid,
+        state: lease.state,
+      });
+      deps.stdout(JSON.stringify({
+        name: profile.metadata.name,
+        root: profile.root,
+        defaultCwd: profile.metadata.defaultCwd,
+        inheritEnvironment: profile.metadata.inheritEnvironment,
+        leases: {
+          active: leases.active.length,
+          ambiguous: leases.ambiguous.length,
+          stale: leases.stale.length,
+          entries: {
+            active: leases.active.map(describeLease),
+            ambiguous: leases.ambiguous.map(describeLease),
+            stale: leases.stale.map(describeLease),
+          },
+          guidance: "Inspect ambiguous lease paths manually; do not remove an entry unless its launcher and child processes are proven absent.",
+        },
+      }, null, 2));
       return 0;
     }
     case "rename": {
