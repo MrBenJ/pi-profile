@@ -41,6 +41,8 @@ Missing values are prompted only in a terminal. Scripts must provide required va
 
 `config <name> --default-cwd <directory>` intentionally stores the path without requiring it to exist immediately, so removable volumes, network mounts, and directories created later remain usable. Every launch validates the selected effective directory and fails clearly if it is then missing or not a directory.
 
+On a completely new installation, `pi-profile list` initializes the private `~/.pi/profiles` parent (mode `0700` on POSIX) so reads can participate in the same mutation lock protocol. It creates no profile or credential files; subsequent empty lists are read-only.
+
 Optional shell alias (not installed automatically):
 
 ```bash
@@ -138,7 +140,7 @@ Rename, removal, and metadata updates refuse live or unverifiable leases. A same
 
 Mutation locks record a random owner id, hostname, PID, and creation time. Normal release verifies that exact owner before unlinking. A crash can leave a lock, journal, or import staging directory; the manager never silently steals it. After confirming the reported process exited, run `pi-profile recover`. Recovery clears only a same-host lock whose PID is provably absent and only transaction/staging paths whose owner metadata agrees. For rename journals, it deterministically restores a sole source or staging directory to the original profile, or verifies a sole committed destination before clearing the journal. Collisions, missing ownership markers, live PIDs, inaccessible PID state, other-host owners, malformed metadata, and paths outside the profile parent remain blocked and unchanged for manual inspection. Lock wait failures report the observed owner after a bounded five-second wait. A crash can also leave harmless `.pi-profile.lock.release-*` or atomic-write `.*.tmp` files. Recovery intentionally does not delete these owner-ambiguous artifacts; inspect and remove them manually only when provenance is certain. They do not block ordinary profile operations.
 
-The launcher handles Ctrl+C until Pi exits, then removes the session lease. In an interactive terminal it relies on the terminal's process-group SIGINT delivery instead of signaling Pi a second time.
+The launcher handles Ctrl+C until Pi exits, then removes the session lease. In an interactive terminal it relies on the terminal's process-group SIGINT delivery instead of signaling Pi a second time. If publishing the child PID fails, a proven child exit allows the launcher to remove only its exact unchanged lease. If exit cannot be proven, the error names the retained lease file and child PID; verify that PID is gone before manually removing that exact file. Changed or potentially live lease evidence is never erased.
 
 ## Indicator extension
 

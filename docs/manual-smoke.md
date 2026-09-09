@@ -59,7 +59,7 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 
 ## Windows-specific
 
-- [ ] Verify both global `<bin>/node_modules/.../cli.js` and local `node_modules/.bin/../@earendil-works/.../cli.js` npm `pi.cmd` layouts resolve to the installed Node CLI without `shell:true`.
+- [ ] Verify global and local npm `pi.cmd` layouts resolve the contained `bin.pi` declared by `@earendil-works/pi-coding-agent/package.json`, launching it with Node argv and without `shell:true`.
 - [ ] Test spaces, metacharacters, and Unicode in profile cwd and Pi arguments.
 - [ ] Test Ctrl+C from Windows Terminal and confirm Pi receives one terminal interrupt, the launcher waits for it to exit, and the lease is removed; retain conservative evidence if the child survives.
 - [ ] Confirm path/device-name validation and normal current-user ACL behavior.
