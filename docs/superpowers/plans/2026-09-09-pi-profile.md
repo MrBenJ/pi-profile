@@ -220,7 +220,7 @@ expect(env.PI_CODING_AGENT_SESSION_DIR).toBe("/personal/sessions"); // intention
 **Consumes:** Launch validation, environment builder, lease owner.
 **Produces:** `runPi(request: LaunchRequest, executable: {command:string; prefixArgs:string[]}): Promise<{code:number|null; signal:NodeJS.Signals|null}>`, `resolvePi(): Promise<{command:string; prefixArgs:string[]}>`.
 
-- [ ] Write child-process tests for argv/cwd/env, nonzero exit, spawn failure, signal forwarding, and stdin/stdout inheritance. Use a fake Node executable with synthetic values, not a shell script.
+- [x] Write child-process tests for argv/cwd/env, nonzero exit, spawn failure, signal forwarding, and stdin/stdout inheritance. Use a fake Node executable with synthetic values, not a shell script.
 
 ```js
 // tests/fixtures/fake-pi.mjs
@@ -229,12 +229,12 @@ writeFileSync(process.env.TEST_CAPTURE, JSON.stringify({ argv: process.argv.slic
 process.exit(Number(process.env.TEST_EXIT_CODE || 0));
 ```
 
-- [ ] Run failing process tests.
-- [ ] Resolve normal Pi on POSIX. On Windows resolve the installed Node CLI entry behind the npm shim and launch via Node; do not concatenate user argv into cmd.exe or use shell:true. Reject an unsupported wrapper with actionable instructions rather than executing ambiguously quoted input.
-- [ ] Implement spawn with an argument array, validated cwd, filtered environment, inherited stdio and child PID lease publication. Inject the absolute extension before session arguments, never after `--`. Keep management invocations free of session-only flags. Parse only enough Pi grammar to classify subcommands; a word in an option value is not a command.
-- [ ] On child error/exit perform idempotent cleanup. Do not remove live-child evidence when only the parent is shutting down. Handle platform-specific signal behavior without double-delivering Ctrl+C from a shared process group.
-- [ ] Test metacharacters, spaces, Unicode paths, `--`, print/json/rpc, concurrent profiles and same-profile sessions. Verify stdout remains machine-clean for JSON/RPC.
-- [ ] Run tests/typecheck and commit launcher support.
+- [x] Run failing process tests.
+- [x] Resolve normal Pi on POSIX. On Windows resolve the installed Node CLI entry behind the npm shim and launch via Node; do not concatenate user argv into cmd.exe or use shell:true. Reject an unsupported wrapper with actionable instructions rather than executing ambiguously quoted input.
+- [x] Implement spawn with an argument array, validated cwd, filtered environment, inherited stdio and child PID lease publication. Inject the absolute extension before session arguments, never after `--`. Keep management invocations free of session-only flags. Parse only enough Pi grammar to classify subcommands; a word in an option value is not a command.
+- [x] On child error/exit perform idempotent cleanup. Do not remove live-child evidence when only the parent is shutting down. Handle platform-specific signal behavior without double-delivering Ctrl+C from a shared process group.
+- [x] Test metacharacters, spaces, Unicode paths, `--`, print/json/rpc, concurrent profiles and same-profile sessions. Verify stdout remains machine-clean for JSON/RPC.
+- [x] Run tests/typecheck and commit launcher support.
 
 ## Task 6: Complete command-line management and prompts
 
