@@ -63,6 +63,11 @@ describe("parseCli", () => {
   ] as const)("parses %j", (argv, expected) => expect(parseCli([...argv])).toEqual(expected));
 });
 
+test("--cwd before a manager command reports a clear usage error", () => {
+  expect(() => parseCli(["--cwd", fixture, "config"])).toThrow(/--cwd.*profile.*management/i);
+  expect(() => parseCli([`--cwd=${fixture}`, "recover"])).toThrow(/--cwd.*profile.*management/i);
+});
+
 test("help and version are usable without profiles", async () => {
   expect(await main(["--help"], deps)).toBe(0);
   expect(stdout.join("\n")).toContain("Usage: pi-profile");
@@ -119,6 +124,12 @@ test("config edits metadata and native pi config launches under the profile", as
   expect(await main(["config", "work", "--clear-default-cwd"], deps)).toBe(0);
   expect(await main(["config", "work", "--pi"], deps)).toBe(0);
   expect(launched.at(-1)?.piArgs).toEqual(["config"]);
+});
+
+test("config --pi maps signal exits the same way as profile launch", async () => {
+  await create("work");
+  deps = { ...deps, runPi: async () => ({ code: null, signal: "SIGTERM" }) };
+  expect(await main(["config", "work", "--pi"], deps)).toBe(143);
 });
 
 test("rejects reserved routing inheritance", async () => {

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -55,6 +55,24 @@ test("propagates nonzero and signal exits", async () => {
   if (process.platform !== "win32") {
     expect((await runPi(request([], { TEST_SELF_SIGNAL: "SIGTERM" }), executable)).signal).toBe("SIGTERM");
   }
+});
+
+test("SIGINT waits for a synthetic child and releases its lease", async () => {
+  if (process.platform === "win32") return;
+  const running = runPi(request([], { TEST_WAIT_FOR_SIGNAL: "1" }), executable);
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      await access(capture);
+      break;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  await access(capture);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  process.kill(process.pid, "SIGINT");
+  await expect(running).resolves.toEqual({ code: null, signal: "SIGINT" });
+  expect((await inspectLeases(profile)).active).toHaveLength(0);
 });
 
 test("reports spawn failures and releases its lease", async () => {

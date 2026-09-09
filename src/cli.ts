@@ -96,6 +96,7 @@ export function parseCli(argv: string[]): CliCommand {
     const cwd = takeValue(argv, 0, "--cwd");
     const profile = argv[2];
     if (!profile) usage("--cwd requires a profile name");
+    if (managerCommands.has(profile)) usage("--cwd launches a profile; put Pi management commands after a profile name");
     return { command: "launch", profile, cwd, piArgs: argv.slice(3) };
   }
   if (argv[0]?.startsWith("--cwd=")) {
@@ -103,6 +104,7 @@ export function parseCli(argv: string[]): CliCommand {
     if (!cwd) usage("--cwd requires a value");
     const profile = argv[1];
     if (!profile) usage("--cwd requires a profile name");
+    if (managerCommands.has(profile)) usage("--cwd launches a profile; put Pi management commands after a profile name");
     return { command: "launch", profile, cwd, piArgs: argv.slice(2) };
   }
   const first = argv[0];
@@ -179,6 +181,11 @@ async function requiredValue(value: string | undefined, label: string, deps: Cli
   return entered;
 }
 
+function mappedExitStatus(result: { code: number | null; signal: NodeJS.Signals | null }): number {
+  if (result.code !== null) return result.code;
+  return result.signal ? 128 + (osConstants.signals[result.signal] ?? 0) : 1;
+}
+
 async function launchProfile(command: Extract<CliCommand, { command: "launch" }>, deps: CliDependencies): Promise<number> {
   let name = command.profile;
   if (!name) {
@@ -202,8 +209,7 @@ async function launchProfile(command: Extract<CliCommand, { command: "launch" }>
   }
   const cwd = await selectWorkingDirectory(profile, command.cwd ? expandPath(command.cwd, deps) : undefined, deps.cwd);
   const result = await deps.runPi({ profile, piArgs: command.piArgs, cwd, env: buildEnvironment(profile, deps.env) });
-  if (result.code !== null) return result.code;
-  return result.signal ? 128 + (osConstants.signals[result.signal] ?? 0) : 1;
+  return mappedExitStatus(result);
 }
 
 async function retryStale(operation: (clear: boolean) => Promise<void>, clear: boolean, deps: CliDependencies): Promise<void> {
@@ -307,7 +313,7 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
         const profile = await deps.store.get(name);
         const cwd = await selectWorkingDirectory(profile, undefined, deps.cwd);
         const result = await deps.runPi({ profile, piArgs: ["config"], cwd, env: buildEnvironment(profile, deps.env) });
-        return result.code ?? 1;
+        return mappedExitStatus(result);
       }
       if (operation.type === "inherit" || operation.type === "no-inherit") {
         validateEnvironmentName(operation.name);

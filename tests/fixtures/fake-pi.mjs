@@ -12,7 +12,9 @@ if (process.env.TEST_CAPTURE) {
     ordinary: process.env.TEST_ORDINARY,
   }));
 }
-if (process.env.TEST_SELF_SIGNAL) {
+if (process.env.TEST_WAIT_FOR_SIGNAL) {
+  setInterval(() => {}, 1000);
+} else if (process.env.TEST_SELF_SIGNAL) {
   process.kill(process.pid, process.env.TEST_SELF_SIGNAL);
 } else {
   process.exit(Number(process.env.TEST_EXIT_CODE || 0));

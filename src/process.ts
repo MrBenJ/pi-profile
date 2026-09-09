@@ -90,6 +90,17 @@ export async function runPi(request: LaunchRequest, target: Executable): Promise
     handlers.set(signal, handler);
     process.on(signal, handler);
   }
+  const terminalBroadcastsInterrupt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const interruptHandler = () => {
+    // A real terminal sends Ctrl+C to the whole foreground process group, so
+    // forwarding here would deliver SIGINT twice. Non-interactive callers that
+    // signal only this launcher still need us to propagate it to the child.
+    if (!terminalBroadcastsInterrupt && child.exitCode === null && child.signalCode === null) {
+      try { child.kill("SIGINT"); } catch { /* The child may have exited concurrently. */ }
+    }
+  };
+  handlers.set("SIGINT", interruptHandler);
+  process.on("SIGINT", interruptHandler);
 
   let retainLease = false;
   try {
