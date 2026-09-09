@@ -307,7 +307,7 @@ steps:
 - [x] Document npm global installation, unchanged plain Pi, every CLI command, optional manual alias, supported Pi/Node versions, inherited-variable names, trusted-project exception, ambient/cloud limitations, import symlink failures, active-profile safeguards and explicit recovery. Do not claim OS isolation or protected host filesystem access.
 - [x] Provide manual steps for different provider logins, refresh persistence, concurrent TUI indicators, profile-specific config/skills/trust/sessions, stale leases and Windows Ctrl+C. Real credentials remain a user action, not an automated fixture.
 - [x] Run `npm run verify`, `npm pack --dry-run`, tarball smoke tests, and `git diff --check`. Save actual command/version/status evidence; mark other-platform and real-login checks unverified until run.
-- [ ] Request independent read-only code review, fix confirmed findings serially with regression tests, rerun checks. Do not call a review process exiting zero an approval without reading its findings.
+- [x] Request independent read-only code review, fix confirmed findings serially with regression tests, rerun checks. Do not call a review process exiting zero an approval without reading its findings.
 - [x] Commit the final verified state on the feature branch. If no authorized remote exists, deliver local branch/commit and unresolved manual checks; do not push/create a repository/merge. If a remote is subsequently authorized, follow the reviewed-PR workflow in no-merge mode.
 
 ## Plan self-review

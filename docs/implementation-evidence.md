@@ -29,10 +29,26 @@ Evidence is recorded from temporary fixtures only. No real Pi credentials or `~/
 - Temporary fixtures: ambient `$HOME/.agents/skills`, selected-profile `skills`, trusted project `.pi/skills`, and `PI_CODING_AGENT_SESSION_DIR`.
 - Result: PASS; `get_commands` reported all three synthetic skills and `/profile`, and `get_state.sessionFile` was under the explicit temporary session root.
 
+## Independent review round 1 fixes
+
+Claude Opus reviewed the branch read-only. The implementation worker did not spawn a reviewer. All eight reported items received regressions and fixes:
+
+- stale mutation locks now carry owner id/hostname/PID/time, normal release verifies ownership, and explicit `pi-profile recover` refuses live, unknown, remote, malformed, or path-ambiguous state;
+- interrupted imports and orphan import stages have conservative same-host/dead-owner recovery tests;
+- import copying occurs outside the parent mutation lock, with destination/journal revalidation during brief publication;
+- reads coordinate on the parent lock and no longer misreport a healthy journal as abandoned;
+- Pi `auth` and `uninstall` join every documented native management command, with exact-argv and real Pi offline parser tests;
+- `--help`, `-h`, `help`, `--version`, and `-v` provide local CLI output;
+- profile metadata updates use a locked read-transform-write operation, and concurrent inherited-name updates retain both names;
+- the former compatibility fixture is now an honest policy-contract test; real offline Pi coverage lives in `tests/native-pi.test.ts`;
+- picker, import, config, and removal cancellations emit explicit messages.
+
+Native built-CLI checks: PASS — `pi-profile work --offline auth --help` and `uninstall --help` produced Pi's native command help without indicator injection.
+
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
-- `npm run verify`: PASS — 14 test files, 158 tests; TypeScript no-emit check and compiled build passed.
+- `npm run verify`: PASS — 15 test files, 184 tests; TypeScript no-emit check and compiled build passed.
 - `npm pack --dry-run`: PASS — package contained only declared runtime/docs files.
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
@@ -43,5 +59,5 @@ Evidence is recorded from temporary fixtures only. No real Pi credentials or `~/
 - Linux and Windows CI jobs, Node `22.19.0`, Windows npm-shim/Ctrl+C behavior, and Linux filesystem/signal behavior are defined in CI/manual checks but were not run locally.
 - Real OAuth/API-key login, logout, refresh, provider account crossover, and cloud SDK default-file/metadata authentication were not tested. Those require user-controlled disposable accounts and may access networks.
 - Interactive TUI footer/title appearance, concurrent human TUI sessions, and manual trust/model/session selectors were not visually verified; RPC and extension harness behavior passed.
-- Destructive recovery from a real crash, PID reuse, unknown-host leases, and manual journal recovery were tested through synthetic state where automated, not through destructive host-level fault injection.
-- Independent read-only review is pending from the orchestrator, as required by the execution boundary; no nested reviewer was launched by this worker.
+- Destructive recovery from a real crash, PID reuse, unknown-host leases, and journal recovery were tested through synthetic interrupted state where automated, not through destructive host-level fault injection.
+- Independent read-only review round 1 completed; orchestrator round 2 is pending. No nested reviewer was launched by this worker.
