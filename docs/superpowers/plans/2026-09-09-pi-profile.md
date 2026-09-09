@@ -172,7 +172,7 @@ expect((await store.get("work")).root).toBe(work.root);
 **Consumes:** Task 2 mutation transactions and Task 1 validators.
 **Produces:** `inspectImport(source: string): Promise<{externalResources: string[]}>`, `importProfile(store: ProfileStore, name: string, source: string): Promise<Profile>`.
 
-- [ ] Write tests with synthetic `auth.json` bytes, settings, nested package files, an internal relative symlink, an escaping link, and an absolute link. Assert source bytes and timestamps are not modified. Set escaping target to an unrelated test-owned directory and verify it is never copied or removed.
+- [x] Write tests with synthetic `auth.json` bytes, settings, nested package files, an internal relative symlink, an escaping link, and an absolute link. Assert source bytes and timestamps are not modified. Set escaping target to an unrelated test-owned directory and verify it is never copied or removed.
 
 ```ts
 const secretFixture = Buffer.from("opaque-auth-fixture-not-a-real-token");
@@ -182,12 +182,12 @@ expect(await readFile(join(imported.root, "auth.json"))).toEqual(secretFixture);
 expect(await readFile(join(source, "auth.json"))).toEqual(secretFixture);
 ```
 
-- [ ] Run tests to demonstrate missing import implementation.
-- [ ] Use lstat-based traversal, preserving files/directories and only contained relative symlinks. Reject special files, absolute/escaping/dangling links, source/destination overlap, and filesystem changes that invalidate inspection. Do not execute imported packages or secret-bearing configuration commands. Exclude manager markers, leases and journals.
-- [ ] Copy to owned hidden staging, fix restrictive storage permissions without removing executable bits needed by package programs, create fresh metadata, then publish under mutation lock. Revalidate destination absence immediately before publication.
-- [ ] Inspect settings only as JSON data, without executing commands. Report absolute and home-relative resource references and session storage outside the source as preserved external paths; do not reject explicit native Pi configuration. Caller displays the report before confirmation; noninteractive import requires an explicit `--yes`.
-- [ ] Inject mid-copy failure and verify no valid partial destination, original data intact, and no deletion outside owned staging. Test import from an already marked profile excludes leases and copies no stale manager metadata.
-- [ ] Run all checks and commit import support.
+- [x] Run tests to demonstrate missing import implementation.
+- [x] Use lstat-based traversal, preserving files/directories and only contained relative symlinks. Reject special files, absolute/escaping/dangling links, source/destination overlap, and filesystem changes that invalidate inspection. Do not execute imported packages or secret-bearing configuration commands. Exclude manager markers, leases and journals.
+- [x] Copy to owned hidden staging, fix restrictive storage permissions without removing executable bits needed by package programs, create fresh metadata, then publish under mutation lock. Revalidate destination absence immediately before publication.
+- [x] Inspect settings only as JSON data, without executing commands. Report absolute and home-relative resource references and session storage outside the source as preserved external paths; do not reject explicit native Pi configuration. Caller displays the report before confirmation; noninteractive import requires an explicit `--yes`.
+- [x] Inject mid-copy failure and verify no valid partial destination, original data intact, and no deletion outside owned staging. Test import from an already marked profile excludes leases and copies no stale manager metadata.
+- [x] Run all checks and commit import support.
 
 ## Task 4: Verified launch isolation policy
 

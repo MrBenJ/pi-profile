@@ -44,6 +44,10 @@ export class ProfileStore {
   }
 
   async create(metadata: ProfileMetadata): Promise<Profile> {
+    return this.createPopulated(metadata, async () => undefined);
+  }
+
+  async createPopulated(metadata: ProfileMetadata, populate: (stagingRoot: string) => Promise<void>): Promise<Profile> {
     const parsed = parseMetadata(metadata);
     return withMutationLock(this.profilesRoot, async () => {
       await this.assertNoUncertainJournal();
@@ -55,6 +59,7 @@ export class ProfileStore {
       await atomicWriteJson(journal, { version: 1, operation: "create", staging, destination });
       try {
         await mkdir(staging, { mode: 0o700 });
+        await populate(staging);
         await atomicWriteJson(join(staging, MARKER), parsed);
         await this.fault?.("create-before-promotion");
         if (await pathKind(destination) !== "missing") throw new ProfileError("PROFILE_EXISTS", `Profile already exists: ${parsed.name}`);
