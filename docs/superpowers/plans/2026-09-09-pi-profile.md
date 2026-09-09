@@ -116,8 +116,8 @@ Every test owns a fresh `mkdtemp` directory and deletes only that directory in a
 **Consumes:** Spec slug/storage/version requirements.
 **Produces:** `validateName(input: string): string`, `parseMetadata(input: unknown): ProfileMetadata`, `profilePath(parent: string, name: string): string`.
 
-- [ ] Add package scripts `build: tsc`, `typecheck: tsc --noEmit`, `test: vitest run`, `verify: npm run typecheck && npm test && npm run build`. Compile NodeNext ESM into dist. Declare Pi as a peer and a pinned development dependency; do not bundle Pi into runtime dependencies. Set the engine floor and bin/extension manifests.
-- [ ] Write the failing validation tests:
+- [x] Add package scripts `build: tsc`, `typecheck: tsc --noEmit`, `test: vitest run`, `verify: npm run typecheck && npm test && npm run build`. Compile NodeNext ESM into dist. Declare Pi as a peer and a pinned development dependency; do not bundle Pi into runtime dependencies. Set the engine floor and bin/extension manifests.
+- [x] Write the failing validation tests:
 
 ```ts
 import { expect, test } from "vitest";
@@ -129,8 +129,8 @@ test("accepts portable slugs", () => expect(validateName("client-a")).toBe("clie
 test("rejects unsupported metadata", () => expect(() => parseMetadata({ version: 2 })).toThrow());
 ```
 
-- [ ] Run `npm test -- tests/metadata.test.ts`; record missing-module/test failure before implementation.
-- [ ] Implement validation using a slug regex, reserved CLI names and Windows device basenames. Validate all required keys, ISO timestamp, absolute defaultCwd or null, unique environment names, and supported version. Reject unknown metadata keys to catch typos.
+- [x] Run `npm test -- tests/metadata.test.ts`; record missing-module/test failure before implementation.
+- [x] Implement validation using a slug regex, reserved CLI names and Windows device basenames. Validate all required keys, ISO timestamp, absolute defaultCwd or null, unique environment names, and supported version. Reject unknown metadata keys to catch typos.
 
 ```ts
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -138,8 +138,8 @@ const device = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 // Reject if !slug.test(name), device.test(name), or reserved.has(name).
 ```
 
-- [ ] Test manifest targets exist after build and published tarball excludes tests, auth fixtures and worktrees. Run `npm run verify` and `npm pack --dry-run`.
-- [ ] Commit only Task 1 files after green verification.
+- [x] Test manifest targets exist after build and published tarball excludes tests, auth fixtures and worktrees. Run `npm run verify` and `npm pack --dry-run`.
+- [x] Commit only Task 1 files after green verification.
 
 ## Task 2: Transactional store and active-profile safety
 
