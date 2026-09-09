@@ -30,6 +30,14 @@ describe("package manifest", () => {
     expect(ignore.split(/\r?\n/u)).toContain("/.pack-fixture-*/");
   });
 
+  test("builds dist once before parallel test files", async () => {
+    const config = await readFile(resolve(root, "vitest.config.ts"), "utf8");
+    expect(config).toContain('globalSetup: ["./tests/global-setup.ts"]');
+    for (const file of ["tests/e2e.test.ts", "tests/native-pi.test.ts"]) {
+      expect(await readFile(resolve(root, file), "utf8")).not.toContain("typescript/bin/tsc");
+    }
+  });
+
   test("public entrypoint sources exist for the build", async () => {
     await expect(access(resolve(root, "src/cli.ts"))).resolves.toBeUndefined();
     await expect(access(resolve(root, "src/extension.ts"))).resolves.toBeUndefined();

@@ -13,7 +13,6 @@ let fakeBin: string;
 let environment: NodeJS.ProcessEnv;
 
 beforeAll(async () => {
-  await exec(process.execPath, [resolve(repository, "node_modules/typescript/bin/tsc")], { cwd: repository });
   fixture = await mkdtemp(join(tmpdir(), "pi-profile-e2e-"));
   home = join(fixture, "home");
   fakeBin = join(fixture, "bin");

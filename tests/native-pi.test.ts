@@ -16,7 +16,6 @@ const cli = (...args: string[]) => exec(process.execPath, [join(repository, "bin
 });
 
 beforeAll(async () => {
-  await exec(process.execPath, [join(repository, "node_modules", "typescript", "bin", "tsc")], { cwd: repository });
   fixture = await mkdtemp(join(tmpdir(), "pi-profile-native-parser-"));
   const home = join(fixture, "home");
   await mkdir(home);
