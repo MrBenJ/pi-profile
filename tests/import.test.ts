@@ -31,10 +31,30 @@ test("copies opaque profile data without changing its source", async () => {
   expect((await lstat(join(imported.root, "extensions", "hello.js"))).mode & 0o111).not.toBe(0);
 });
 
-test("preserves contained relative symlinks", async () => {
+test("preserves contained relative file symlinks", async () => {
   await symlink("sessions/one.jsonl", join(source, "latest"));
   const imported = await importProfile(store, "personal", source);
   expect(await readlink(join(imported.root, "latest"))).toBe("sessions/one.jsonl");
+});
+
+test("preserves relative directory symlinks through promotion and profile rename", async () => {
+  await symlink("sessions", join(source, "session-link"), "dir");
+  const imported = await importProfile(store, "personal", source, { platform: "win32" });
+  expect(await readlink(join(imported.root, "session-link"))).toBe("sessions");
+  expect(await readFile(join(imported.root, "session-link", "one.jsonl"), "utf8")).toBe("synthetic session");
+  await store.rename("personal", "private");
+  expect(await readlink(join(fixture, "profiles", "private", "session-link"))).toBe("sessions");
+  expect(await readFile(join(fixture, "profiles", "private", "session-link", "one.jsonl"), "utf8")).toBe("synthetic session");
+});
+
+test("Windows directory symlink privilege failures are actionable", async () => {
+  await symlink("sessions", join(source, "session-link"), "dir");
+  const permissionError = Object.assign(new Error("not permitted"), { code: "EPERM" });
+  await expect(importProfile(store, "personal", source, {
+    platform: "win32",
+    createSymlink: async () => { throw permissionError; },
+  })).rejects.toMatchObject({ code: "SYMLINK_PERMISSION" });
+  await expect(store.get("personal")).rejects.toThrow();
 });
 
 test.each([

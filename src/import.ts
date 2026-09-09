@@ -91,28 +91,44 @@ export async function inspectImport(source: string): Promise<{ externalResources
   return { externalResources: [...new Set(externalResources)] };
 }
 
+interface CopyOptions {
+  beforeCopy?: (sourcePath: string) => void | Promise<void>;
+  platform: NodeJS.Platform;
+  createSymlink: typeof symlink;
+}
+
 async function copyTree(
   sourceRoot: string,
   source: string,
   destination: string,
-  beforeCopy?: (sourcePath: string) => void | Promise<void>,
+  options: CopyOptions,
 ): Promise<void> {
   for (const entry of await readdir(source, { withFileTypes: true })) {
     if (excludedNames.has(entry.name) || entry.name.startsWith(".pi-profile-journal-")) continue;
     const from = join(source, entry.name);
     const to = join(destination, entry.name);
-    await beforeCopy?.(from);
+    await options.beforeCopy?.(from);
     const before = await lstat(from);
     if (before.isSymbolicLink()) {
       const target = await readlink(from);
       if (isAbsolute(target)) throw new ProfileError("UNSAFE_SYMLINK", `Import rejects absolute symlink: ${from}`);
       const resolvedTarget = resolve(dirname(from), target);
       if (!isContained(sourceRoot, resolvedTarget)) throw new ProfileError("UNSAFE_SYMLINK", `Import rejects escaping symlink: ${from}`);
-      await lstat(resolvedTarget).catch(() => { throw new ProfileError("UNSAFE_SYMLINK", `Import rejects dangling symlink: ${from}`); });
-      await symlink(target, to, process.platform === "win32" ? (await lstat(resolvedTarget)).isDirectory() ? "junction" : "file" : undefined);
+      const targetStats = await lstat(resolvedTarget).catch(() => { throw new ProfileError("UNSAFE_SYMLINK", `Import rejects dangling symlink: ${from}`); });
+      try {
+        // A Windows junction resolves its target when created, which would bind it to
+        // the temporary staging path. A true directory symlink preserves `target`.
+        await options.createSymlink(target, to, options.platform === "win32" ? (targetStats.isDirectory() ? "dir" : "file") : undefined);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (options.platform === "win32" && (code === "EPERM" || code === "EACCES")) {
+          throw new ProfileError("SYMLINK_PERMISSION", `Windows could not preserve relative symlink ${from}; enable Developer Mode or run with permission to create symbolic links`);
+        }
+        throw error;
+      }
     } else if (before.isDirectory()) {
       await mkdir(to, { mode: 0o700 });
-      await copyTree(sourceRoot, from, to, beforeCopy);
+      await copyTree(sourceRoot, from, to, options);
       if (process.platform !== "win32") await chmod(to, 0o700);
     } else if (before.isFile()) {
       await copyFile(from, to);
@@ -131,7 +147,11 @@ export async function importProfile(
   store: ProfileStore,
   name: string,
   source: string,
-  options: { beforeCopy?: (sourcePath: string) => void | Promise<void> } = {},
+  options: {
+    beforeCopy?: (sourcePath: string) => void | Promise<void>;
+    platform?: NodeJS.Platform;
+    createSymlink?: typeof symlink;
+  } = {},
 ): Promise<Profile> {
   validateName(name);
   const sourceRoot = await validateSource(source);
@@ -141,6 +161,10 @@ export async function importProfile(
   }
   await inspectImport(sourceRoot);
   return store.createPopulated(store.metadata(name), async (stagingRoot) => {
-    await copyTree(sourceRoot, sourceRoot, stagingRoot, options.beforeCopy);
+    await copyTree(sourceRoot, sourceRoot, stagingRoot, {
+      ...(options.beforeCopy ? { beforeCopy: options.beforeCopy } : {}),
+      platform: options.platform ?? process.platform,
+      createSymlink: options.createSymlink ?? symlink,
+    });
   });
 }
