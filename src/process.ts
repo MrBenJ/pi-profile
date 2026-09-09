@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { LaunchRequest } from "./contracts.js";
 import { ProfileError } from "./contracts.js";
@@ -74,6 +74,29 @@ export async function resolvePi(
   throw new ProfileError("PI_NOT_FOUND", "Could not find the Pi executable; install Pi (@earendil-works/pi-coding-agent) and ensure pi is on PATH");
 }
 
+export function terminalBroadcastsInterrupt(
+  streams: { stdin: boolean; stdout: boolean; stderr: boolean },
+  platform: NodeJS.Platform = process.platform,
+  groups?: { processGroup: number; terminalForegroundGroup: number },
+): boolean {
+  if (!(streams.stdin || streams.stdout || streams.stderr)) return false;
+  if (platform === "win32" || !groups) return true;
+  return groups.processGroup > 0 && groups.processGroup === groups.terminalForegroundGroup;
+}
+
+function foregroundGroups(platform: NodeJS.Platform): { processGroup: number; terminalForegroundGroup: number } | undefined {
+  if (platform === "win32") return undefined;
+  try {
+    const result = spawnSync("/bin/ps", ["-o", "pgid=", "-o", "tpgid=", "-p", String(process.pid)], { encoding: "utf8" });
+    if (result.status !== 0) return undefined;
+    const [processGroup, terminalForegroundGroup] = result.stdout.trim().split(/\s+/u).map(Number);
+    if (!Number.isSafeInteger(processGroup) || !Number.isSafeInteger(terminalForegroundGroup)) return undefined;
+    return { processGroup: processGroup!, terminalForegroundGroup: terminalForegroundGroup! };
+  } catch {
+    return undefined;
+  }
+}
+
 function sessionArguments(piArgs: string[]): string[] {
   if (classifyInvocation(piArgs) === "management") return [...piArgs];
   return ["--extension", indicatorEntrypoint, ...piArgs];
@@ -129,12 +152,16 @@ export async function runPi(
     handlers.set(signal, handler);
     process.on(signal, handler);
   }
-  const terminalBroadcastsInterrupt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const terminalWillBroadcastInterrupt = terminalBroadcastsInterrupt({
+    stdin: Boolean(process.stdin.isTTY),
+    stdout: Boolean(process.stdout.isTTY),
+    stderr: Boolean(process.stderr.isTTY),
+  }, process.platform, foregroundGroups(process.platform));
   const interruptHandler = () => {
     // A real terminal sends Ctrl+C to the whole foreground process group, so
     // forwarding here would deliver SIGINT twice. Non-interactive callers that
     // signal only this launcher still need us to propagate it to the child.
-    if (!terminalBroadcastsInterrupt && child.exitCode === null && child.signalCode === null) {
+    if (!terminalWillBroadcastInterrupt && child.exitCode === null && child.signalCode === null) {
       try { child.kill("SIGINT"); } catch { /* The child may have exited concurrently. */ }
     }
   };

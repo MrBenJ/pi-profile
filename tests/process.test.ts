@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { buildEnvironment } from "../src/environment.js";
 import { acquireLease, inspectLeases } from "../src/lease.js";
-import { runPi, resolvePi } from "../src/process.js";
+import { runPi, resolvePi, terminalBroadcastsInterrupt } from "../src/process.js";
 import { ProfileStore } from "../src/profile-store.js";
 import type { LaunchRequest, Profile } from "../src/contracts.js";
 
@@ -61,6 +61,13 @@ test("propagates nonzero and signal exits", async () => {
   if (process.platform !== "win32") {
     expect((await runPi(request([], { TEST_SELF_SIGNAL: "SIGTERM" }), executable)).signal).toBe("SIGTERM");
   }
+});
+
+test("terminal SIGINT detection survives redirected stdout and preserves non-TTY propagation", () => {
+  expect(terminalBroadcastsInterrupt({ stdin: true, stdout: false, stderr: true }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(true);
+  expect(terminalBroadcastsInterrupt({ stdin: true, stdout: false, stderr: false }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(true);
+  expect(terminalBroadcastsInterrupt({ stdin: true, stdout: false, stderr: true }, "darwin", { processGroup: 42, terminalForegroundGroup: 99 })).toBe(false);
+  expect(terminalBroadcastsInterrupt({ stdin: false, stdout: false, stderr: false }, "darwin", { processGroup: 42, terminalForegroundGroup: 42 })).toBe(false);
 });
 
 test("SIGINT waits for a synthetic child and releases its lease", async () => {
