@@ -199,6 +199,23 @@ describe("ProfileStore", () => {
     expect((await readdir(profilesRoot)).filter((entry) => entry.includes("create-work"))).toEqual([]);
   });
 
+  test("reports committed create cleanup failure and preserves recovery evidence", async () => {
+    const failing = new ProfileStore({ profilesRoot, now, fault: (point) => {
+      if (point === "create-after-promotion") throw new Error("injected cleanup failure");
+    } });
+    await expect(failing.create(metadata("work"))).rejects.toMatchObject({ code: "CREATE_COMMITTED_CLEANUP_PENDING" });
+    await expect(store.list()).rejects.toThrow(/recovery/i);
+    const journalName = (await readdir(profilesRoot)).find((entry) => entry.startsWith(".pi-profile-journal-"));
+    expect(journalName).toBeTruthy();
+    const journalPath = join(profilesRoot, journalName!);
+    const journal = JSON.parse(await readFile(journalPath, "utf8"));
+    const exitedOwner = { ...journal, pid: 2147483647 }; // serialize the equivalent next-process state
+    await writeFile(journalPath, JSON.stringify(exitedOwner));
+    await writeFile(join(profilesRoot, "work", ".pi-profile-stage.json"), JSON.stringify(exitedOwner));
+    await expect(store.recover()).resolves.toMatchObject({ transactionsRecovered: 1 });
+    await expect(store.get("work")).resolves.toMatchObject({ metadata: { name: "work" } });
+  });
+
   test("removal does not traverse symlinks", async () => {
     const outside = join(fixture, "outside.txt");
     await writeFile(outside, "keep");

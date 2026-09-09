@@ -31,6 +31,20 @@ test("live child remains active even if launcher identity is absent", async () =
   expect((await inspectLeases(profile)).active).toHaveLength(1);
 });
 
+test.each([
+  [0, null],
+  [-1, null],
+  [Number.MAX_SAFE_INTEGER + 1, null],
+  [1, 0],
+  [1, -1],
+  [1, Number.MAX_SAFE_INTEGER + 1],
+])("rejects unsafe launcherPid %s and childPid %s", async (launcherPid, childPid) => {
+  const leases = join(profile.root, ".pi-profile-leases");
+  await mkdir(leases, { mode: 0o700 });
+  await writeFile(join(leases, "invalid.json"), JSON.stringify({ version: 1, id: "invalid", hostname: hostname(), launcherPid, childPid, createdAt: new Date().toISOString(), state: "running" }));
+  await expect(inspectLeases(profile)).rejects.toMatchObject({ code: "INVALID_LEASE" });
+});
+
 test("unknown-host and interrupted startup leases are ambiguous", async () => {
   const leases = join(profile.root, ".pi-profile-leases");
   await mkdir(leases, { mode: 0o700 });

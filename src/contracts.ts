@@ -14,7 +14,7 @@ export interface Profile {
 export interface StoreOptions {
   profilesRoot: string;
   now: () => Date;
-  fault?: (point: "create-before-promotion" | "rename-before-promotion") => void | Promise<void>;
+  fault?: (point: "create-before-promotion" | "create-after-promotion" | "rename-before-promotion") => void | Promise<void>;
 }
 
 export interface LaunchRequest {

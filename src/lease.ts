@@ -18,7 +18,8 @@ function parseLease(value: unknown): Lease {
   if (typeof value !== "object" || value === null) throw new ProfileError("INVALID_LEASE", "Malformed profile lease");
   const lease = value as Partial<Lease>;
   if (lease.version !== 1 || typeof lease.id !== "string" || typeof lease.hostname !== "string" ||
-      !Number.isSafeInteger(lease.launcherPid) || (lease.childPid !== null && !Number.isSafeInteger(lease.childPid)) ||
+      !Number.isSafeInteger(lease.launcherPid) || (lease.launcherPid ?? 0) <= 0 ||
+      (lease.childPid !== null && (!Number.isSafeInteger(lease.childPid) || (lease.childPid ?? 0) <= 0)) ||
       typeof lease.createdAt !== "string" || !["starting", "running", "exited"].includes(lease.state ?? "")) {
     throw new ProfileError("INVALID_LEASE", "Malformed profile lease");
   }

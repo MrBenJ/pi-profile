@@ -84,15 +84,25 @@ export class ProfileStore {
         if (await pathKind(destination) !== "missing") throw new ProfileError("PROFILE_EXISTS", `Profile already exists: ${parsed.name}`);
         const journal = transactionPath(this.profilesRoot, owner.id);
         await atomicWriteJson(journal, { ...owner, operation: "create", staging, destination, metadata: parsed });
+        let committed = false;
         try {
           await this.fault?.("create-before-promotion");
           await rename(staging, destination);
+          committed = true;
           published = true;
-          await rm(join(destination, STAGE_MARKER), { force: true });
-          await rm(journal, { force: true });
+          try {
+            await this.fault?.("create-after-promotion");
+            await rm(join(destination, STAGE_MARKER), { force: true });
+            await rm(journal, { force: true });
+          } catch (error) {
+            throw new ProfileError(
+              "CREATE_COMMITTED_CLEANUP_PENDING",
+              `Profile ${parsed.name} was created at ${destination}, but transaction cleanup is pending; run pi-profile recover (${(error as Error).message})`,
+            );
+          }
           return { root: destination, metadata: parsed };
         } catch (error) {
-          await rm(journal, { force: true }).catch(() => undefined);
+          if (!committed) await rm(journal, { force: true }).catch(() => undefined);
           throw error;
         }
       });
