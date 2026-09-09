@@ -196,7 +196,7 @@ expect(await readFile(join(source, "auth.json"))).toEqual(secretFixture);
 **Consumes:** Validated `Profile` and the confirmed native Pi boundary.
 **Produces:** `buildEnvironment(profile: Profile, parent: NodeJS.ProcessEnv): NodeJS.ProcessEnv`, `validateLaunch(request: LaunchRequest): Promise<void>`.
 
-- [ ] Write failing table tests for the documented provider variable set, AWS and Google selectors, Windows case-insensitive collisions, reserved launcher variables, nested Pi session markers and inherited session-root overrides.
+- [x] Write failing table tests for the documented provider variable set, AWS and Google selectors, Windows case-insensitive collisions, reserved launcher variables, nested Pi session markers and inherited session-root overrides.
 
 ```ts
 const env = buildEnvironment(work, { PATH: "/test/bin", OPENAI_API_KEY: "fixture", PI_CODING_AGENT_DIR: "/personal", PI_CODING_AGENT_SESSION_DIR: "/personal/sessions" });
@@ -206,12 +206,12 @@ expect(env.PI_CODING_AGENT_DIR).toBe(work.root);
 expect(env.PI_CODING_AGENT_SESSION_DIR).toBe("/personal/sessions"); // intentional native override
 ```
 
-- [ ] Implement filtering in one maintained map. Enumerate actual inherited keys for Windows matching; do not retain duplicate cased profile/auth routing entries. Only PI_CODING_AGENT_DIR and PI_PROFILE_NAME are unconditionally replaced. Preserve native session overrides and ordinary environment variables. Never log credential values.
-- [ ] Test that no skill exclusion is generated and no native settings are overwritten merely to enforce policy. Use temporary fixtures for one ambient home skill, one profile skill and one trusted project skill; home skills remain discoverable by design.
-- [ ] Preserve `--session-dir`, `--session`, `--fork`, settings.sessionDir and inherited PI_CODING_AGENT_SESSION_DIR unchanged. Without overrides, assert separate default profile session locations. Include prompt text after `--` to prevent accidental argument reinterpretation.
-- [ ] Test that known AWS/Google credential selector variables are stripped unless allowlisted, but HOME and SDK default locations remain unchanged. Document ambient cloud-file fallback rather than claiming it is blocked.
-- [ ] Run real Pi offline compatibility checks with fake credentials only. A mock executable is not evidence of Pi discovery semantics. Record tested Pi version and supported range in documentation.
-- [ ] Run all checks and commit the native launch policy.
+- [x] Implement filtering in one maintained map. Enumerate actual inherited keys for Windows matching; do not retain duplicate cased profile/auth routing entries. Only PI_CODING_AGENT_DIR and PI_PROFILE_NAME are unconditionally replaced. Preserve native session overrides and ordinary environment variables. Never log credential values.
+- [x] Test that no skill exclusion is generated and no native settings are overwritten merely to enforce policy. Use temporary fixtures for one ambient home skill, one profile skill and one trusted project skill; home skills remain discoverable by design.
+- [x] Preserve `--session-dir`, `--session`, `--fork`, settings.sessionDir and inherited PI_CODING_AGENT_SESSION_DIR unchanged. Without overrides, assert separate default profile session locations. Include prompt text after `--` to prevent accidental argument reinterpretation.
+- [x] Test that known AWS/Google credential selector variables are stripped unless allowlisted, but HOME and SDK default locations remain unchanged. Document ambient cloud-file fallback rather than claiming it is blocked.
+- [x] Run real Pi offline compatibility checks with fake credentials only. A mock executable is not evidence of Pi discovery semantics. Record tested Pi version and supported range in documentation.
+- [x] Run all checks and commit the native launch policy.
 
 ## Task 5: Cross-platform process launcher
 
