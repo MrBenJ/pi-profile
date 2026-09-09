@@ -120,6 +120,50 @@ test("retains actionable lease evidence when publication failure child exit is u
   await retained?.release();
 });
 
+test.each([
+  ["success", {}, { code: 0, signal: null }],
+  ["nonzero", { TEST_EXIT_CODE: "7" }, { code: 7, signal: null }],
+] as const)("preserves %s child outcome and surfaces lease cleanup warning", async (_label, environment, expected) => {
+  const warnings: string[] = [];
+  const leaseFactory = async () => ({
+    lease: { version: 1 as const, id: "cleanup", hostname: "test", launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "starting" as const },
+    setChild: async () => undefined,
+    release: async () => { throw new Error("injected release failure"); },
+  });
+  await expect(runPi(request([], environment), executable, { leaseFactory, onWarning: (message) => warnings.push(message) })).resolves.toEqual(expected);
+  expect(warnings).toHaveLength(1);
+  expect(warnings[0]).toMatch(/lease cleanup.*injected release failure/i);
+});
+
+test("preserves signaled child outcome when lease cleanup fails", async () => {
+  if (process.platform === "win32") return;
+  const warnings: string[] = [];
+  const leaseFactory = async () => ({
+    lease: { version: 1 as const, id: "cleanup", hostname: "test", launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "starting" as const },
+    setChild: async () => undefined,
+    release: async () => { throw new Error("injected release failure"); },
+  });
+  await expect(runPi(request([], { TEST_SELF_SIGNAL: "SIGTERM" }), executable, { leaseFactory, onWarning: (message) => warnings.push(message) })).resolves.toEqual({ code: null, signal: "SIGTERM" });
+  expect(warnings[0]).toMatch(/lease cleanup/i);
+});
+
+test("preserves publication failure as primary when lease cleanup also fails", async () => {
+  const primaryLease = {
+    lease: { version: 1 as const, id: "cleanup", hostname: "test", launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "starting" as const },
+    setChild: async () => { throw new Error("injected publication failure"); },
+    release: async () => { throw new Error("injected release failure"); },
+  };
+  let failure: unknown;
+  try {
+    await runPi(request([], { TEST_WAIT_FOR_SIGNAL: "1" }), executable, { leaseFactory: async () => primaryLease });
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(AggregateError);
+  expect((failure as AggregateError).cause).toMatchObject({ code: "LEASE_PUBLICATION_FAILED" });
+  expect((failure as AggregateError).errors[1]).toMatchObject({ message: "injected release failure" });
+});
+
 test("reports spawn failures and releases its lease", async () => {
   await expect(runPi(request([]), { command: join(fixture, "missing-pi"), prefixArgs: [] })).rejects.toThrow(/start Pi/i);
   expect((await inspectLeases(profile)).active).toHaveLength(0);

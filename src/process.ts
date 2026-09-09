@@ -82,7 +82,11 @@ function sessionArguments(piArgs: string[]): string[] {
 export async function runPi(
   request: LaunchRequest,
   target: Executable,
-  options: { leaseFactory?: typeof acquireLease; publicationDrainMs?: number } = {},
+  options: {
+    leaseFactory?: typeof acquireLease;
+    publicationDrainMs?: number;
+    onWarning?: (message: string) => void;
+  } = {},
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   await validateLaunch(request);
   const owner = await (options.leaseFactory ?? acquireLease)(request.profile);
@@ -96,8 +100,13 @@ export async function runPi(
       windowsHide: false,
     });
   } catch (error) {
-    await owner.release();
-    throw new ProfileError("PI_SPAWN_FAILED", `Could not start Pi: ${(error as Error).message}`);
+    const primary = new ProfileError("PI_SPAWN_FAILED", `Could not start Pi: ${(error as Error).message}`);
+    try {
+      await owner.release();
+    } catch (cleanupError) {
+      throw new AggregateError([primary, cleanupError], `${primary.message}; lease cleanup also failed: ${(cleanupError as Error).message}`, { cause: primary });
+    }
+    throw primary;
   }
 
   const outcome = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveOutcome, rejectOutcome) => {
@@ -133,33 +142,63 @@ export async function runPi(
   process.on("SIGINT", interruptHandler);
 
   let retainLease = false;
+  let result: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+  let primaryError: unknown;
   try {
-    if (!child.pid) return await outcome;
-    try {
-      await owner.setChild(child.pid);
-    } catch (error) {
-      try { child.kill("SIGTERM"); } catch { /* Settlement below decides whether evidence is retained. */ }
-      const drainMs = options.publicationDrainMs ?? 2_000;
-      const settlement = await new Promise<Awaited<typeof settledOutcome> | { kind: "timeout" }>((resolveSettlement) => {
-        const timer = setTimeout(() => resolveSettlement({ kind: "timeout" }), drainMs);
-        settledOutcome.then((value) => {
-          clearTimeout(timer);
-          resolveSettlement(value);
+    if (!child.pid) {
+      result = await outcome;
+    } else {
+      try {
+        await owner.setChild(child.pid);
+      } catch (error) {
+        try { child.kill("SIGTERM"); } catch { /* Settlement below decides whether evidence is retained. */ }
+        const drainMs = options.publicationDrainMs ?? 2_000;
+        const settlement = await new Promise<Awaited<typeof settledOutcome> | { kind: "timeout" }>((resolveSettlement) => {
+          const timer = setTimeout(() => resolveSettlement({ kind: "timeout" }), drainMs);
+          settledOutcome.then((value) => {
+            clearTimeout(timer);
+            resolveSettlement(value);
+          });
         });
-      });
-      if (settlement.kind === "exit") {
-        throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; child exit was confirmed and this launcher's lease was released: ${(error as Error).message}`);
+        if (settlement.kind === "exit") {
+          throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; child exit was confirmed and this launcher's lease was released: ${(error as Error).message}`);
+        }
+        retainLease = true;
+        const leasePath = join(request.profile.root, ".pi-profile-leases", `${owner.lease.id}.json`);
+        throw new ProfileError(
+          "LEASE_PUBLICATION_UNCERTAIN",
+          `Pi started but its child lease could not be recorded and child exit could not be confirmed. Evidence was retained at ${leasePath}; verify child PID ${child.pid} is gone before manually removing that exact lease file: ${(error as Error).message}`,
+        );
       }
-      retainLease = true;
-      const leasePath = join(request.profile.root, ".pi-profile-leases", `${owner.lease.id}.json`);
-      throw new ProfileError(
-        "LEASE_PUBLICATION_UNCERTAIN",
-        `Pi started but its child lease could not be recorded and child exit could not be confirmed. Evidence was retained at ${leasePath}; verify child PID ${child.pid} is gone before manually removing that exact lease file: ${(error as Error).message}`,
-      );
+      result = await outcome;
     }
-    return await outcome;
+  } catch (error) {
+    primaryError = error;
   } finally {
     for (const [signal, handler] of handlers) process.off(signal, handler);
-    if (!retainLease) await owner.release();
   }
+
+  let cleanupError: unknown;
+  if (!retainLease) {
+    try {
+      await owner.release();
+    } catch (error) {
+      cleanupError = error;
+    }
+  }
+  if (primaryError !== undefined) {
+    if (cleanupError !== undefined) {
+      const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+      const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+      throw new AggregateError([primaryError, cleanupError], `${primaryMessage}; lease cleanup also failed: ${cleanupMessage}`, { cause: primaryError });
+    }
+    throw primaryError;
+  }
+  if (cleanupError !== undefined) {
+    const message = `Lease cleanup failed after Pi exited; child status was preserved. Inspect ${request.profile.root} manually: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`;
+    try {
+      (options.onWarning ?? ((warning) => process.stderr.write(`pi-profile: warning: ${warning}\n`)))(message);
+    } catch { /* Warning reporting must not replace the child outcome. */ }
+  }
+  return result!;
 }
