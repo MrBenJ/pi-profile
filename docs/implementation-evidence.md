@@ -90,16 +90,30 @@ User-authorized final acceptance work corrected the remaining review defects wit
 
 User-reported acceptance checks 1–5 passed on macOS, including isolated real OAuth refresh and live-child cancellation/recovery. This implementation worker did not repeat or access those credentials. User-reported Linux Docker verification on Node `22.19.0` passed 208 tests; it is recorded as external evidence only. The authorized release target is macOS, so Windows/Linux manual execution is not a release blocker.
 
+## Fresh independent acceptance review after `10dfc6a`
+
+The orchestrator supplied a new full-branch review; this worker did not delegate it. Findings were addressed serially:
+
+- **MAJOR fixed:** damaged, unreadable, missing-marker, mismatched, and future-version visible roots become actionable discovery diagnostics instead of aborting healthy list/picker results. Direct get/rename/remove remain fail-closed and invalid roots are never auto-deleted.
+- **Related removal scope:** interrupted recursive removal can leave an invalid root. The minimal healthy-list solution was chosen; README/manual guidance requires exact-path inspection and manual removal only after confirming no data must be retained. No broad staged-deletion mechanism was added.
+- **MINOR fixed:** lease release failure no longer replaces successful, nonzero, or signaled child outcomes; it emits a cleanup warning. A primary spawn/publication error plus cleanup failure becomes an `AggregateError` whose cause remains the primary error.
+- **MINOR fixed:** `show` includes exact lease IDs, paths, host/PIDs, state, counts, and safe manual guidance. Corrupt leases still fail closed with their exact retained path and lifecycle operations remain unauthorized.
+- **MINOR explicitly constrained:** owned temporary files plus atomic rename protect process-interruption consistency. No file/parent-directory fsync is implemented, so power-loss/kernel/storage-controller durability is not claimed.
+- **NIT fixed:** recursive import uses the same selected/injected platform for symlink and chmod behavior; simulated Windows no longer runs POSIX mode rewriting.
+
+These fixes await the orchestrator’s fresh read-only review; no clean independent verdict is claimed here.
+
 ## Final automated verification
 
 - Versions: Node `v26.8.1`; npm `11.19.0`; Pi `0.85.1`.
-- `npm run verify`: PASS — 15 test files, 217 tests; TypeScript no-emit check and compiled build passed.
+- `npm run verify`: PASS — 15 test files, 225 tests; TypeScript no-emit check and compiled build passed.
 - `npm pack --dry-run`: PASS — package contained only declared runtime/docs files.
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
 - Round-two final smoke: PASS — fresh `npm pack --dry-run`; native Pi offline `auth`/`uninstall` help through the built launcher; tarball exclusion scan; isolated tarball install; packed CLI help/version/profile creation; and `git diff --check`.
 - **Partially retracted round-three smoke:** package/tarball/install/diff checks passed, but `--export=<file>` and prepended-`--offline` help checks did not establish the claimed parser/dispatch behavior. Replacement native parser, argv-zero subcommand, and non-help checks are recorded above.
 - Post-acceptance final smoke: PASS — built-launcher argv-zero auth/uninstall help with subcommand-unique assertions; offline credential-free auth non-help JSON; direct native `parseArgs` supported/equals export semantics; fresh pack; tarball exclusion scan; isolated install/profile creation; and clean diff/status.
+- Post-discovery-fix macOS smoke: PASS — repeated native subcommand help, credential-free auth non-help behavior, direct parser semantics, fresh pack/exclusions, isolated install/profile creation, and clean diff/status after all code commits.
 - `git diff --check`: PASS.
 
 ## Not verified in this environment

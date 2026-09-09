@@ -50,11 +50,14 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 - [ ] Launch two `work` sessions concurrently; confirm both run and rename/removal remain blocked until both exit.
 - [ ] Terminate a launcher while its child remains alive; confirm rename/removal remain blocked.
 - [ ] Create a same-host stale lease fixture; confirm interactive cleanup asks and scripted cleanup requires `--clear-stale-leases`.
-- [ ] Create an unknown-host lease fixture; confirm it is never cleared automatically.
+- [ ] Create an unknown-host or interrupted-start lease fixture; confirm `show` reports its exact ID/path/PIDs and manual guidance and never clears it automatically.
+- [ ] Create a corrupt lease; confirm `show` fails closed with the exact retained path and lifecycle mutations remain blocked.
 - [ ] Interrupt a disposable import process, verify ordinary commands report the lock owner, then run `pi-profile recover`; confirm only same-host/provably-dead owner artifacts are removed.
 - [ ] Interrupt rename before moving the source, while staged, and after destination promotion; confirm recovery respectively restores source metadata, moves staging back to source, or verifies the committed destination. Add a collision and confirm recovery changes nothing.
 - [ ] Attempt recovery with a live PID, inaccessible PID state, malformed owner, and another hostname; confirm every case remains blocked and unchanged.
 - [ ] If crash testing leaves `.pi-profile.lock.release-*` or atomic `.*.tmp` files, confirm normal operations remain unblocked and only remove them manually after proving provenance.
+- [ ] Place missing-marker, malformed-marker, and future-version roots beside a healthy profile; confirm list/picker report each exact invalid path, still expose the healthy profile, and direct rename/remove remain blocked.
+- [ ] Simulate lease-release failure after child success/nonzero/signal exit; confirm the child status is preserved and cleanup is surfaced as a warning.
 - [ ] Run `/profile`; confirm it displays only name/root and cannot switch profiles.
 
 ## Windows-specific
@@ -68,5 +71,7 @@ Use only disposable test accounts and profiles. Automated tests must never perfo
 
 - [ ] Verify directory mode `0700` and manager file mode `0600` on the target filesystem.
 - [ ] Test SIGTERM/SIGHUP forwarding and lease cleanup.
+
+Atomic rename behavior is tested for process interruption only. Do not record sudden-power-loss durability as verified without a filesystem-specific fsync/power-cut test.
 
 Record unverified items honestly in `docs/implementation-evidence.md`.
