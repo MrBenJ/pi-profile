@@ -159,6 +159,9 @@ export async function importProfile(
   if (isContained(sourceRoot, profilesRoot) || isContained(profilesRoot, sourceRoot)) {
     throw new ProfileError("IMPORT_OVERLAP", "Import source and profile destination must not overlap");
   }
+  // Deliberately revalidate the source tree after the earlier user-facing
+  // inspection. The source may have changed between confirmation and import;
+  // copyTree then re-stats each entry around its copy to close that later race.
   await inspectImport(sourceRoot);
   return store.createPopulated(store.metadata(name), async (stagingRoot) => {
     await copyTree(sourceRoot, sourceRoot, stagingRoot, {
