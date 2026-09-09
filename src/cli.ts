@@ -260,7 +260,7 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       const leases = await inspectLeases(profile);
       const describeLease = (lease: (typeof leases.active)[number]) => ({
         id: lease.id,
-        path: join(profile.root, ".pi-profile-leases", `${lease.id}.json`),
+        path: lease.path,
         hostname: lease.hostname,
         launcherPid: lease.launcherPid,
         childPid: lease.childPid,

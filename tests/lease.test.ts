@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { acquireLease, inspectLeases } from "../src/lease.js";
+import { acquireLease, clearStaleLeases, inspectLeases } from "../src/lease.js";
 import type { Profile } from "../src/contracts.js";
 
 let fixture: string;
@@ -31,6 +31,44 @@ test("release refuses to erase a changed lease record", async () => {
   await writeFile(path, JSON.stringify(replacement));
   await expect(owner.release()).rejects.toMatchObject({ code: "LEASE_OWNERSHIP_LOST" });
   expect(JSON.parse(await readFile(path, "utf8"))).toEqual(replacement);
+});
+
+test("setChild after release reports lease lifecycle state", async () => {
+  const owner = await acquireLease(profile);
+  await owner.release();
+  await expect(owner.setChild(process.pid)).rejects.toMatchObject({ code: "LEASE_RELEASED" });
+});
+
+test("rejects traversal lease IDs without touching an outside sentinel", async () => {
+  const leases = join(profile.root, ".pi-profile-leases");
+  const outside = join(fixture, "agent", "auth.json");
+  await mkdir(join(outside, ".."), { recursive: true });
+  await mkdir(leases, { mode: 0o700 });
+  await writeFile(outside, "sentinel");
+  await writeFile(join(leases, "evil.json"), JSON.stringify({ version: 1, id: "../../../agent/auth", hostname: hostname(), launcherPid: 2147483647, childPid: null, createdAt: new Date().toISOString(), state: "exited" }));
+  await expect(clearStaleLeases(profile)).rejects.toMatchObject({ code: "INVALID_LEASE" });
+  expect(await readFile(outside, "utf8")).toBe("sentinel");
+});
+
+test("filename-id mismatch cannot delete another live lease", async () => {
+  const leases = join(profile.root, ".pi-profile-leases");
+  await mkdir(leases, { mode: 0o700 });
+  const live = { version: 1, id: "live", hostname: hostname(), launcherPid: process.pid, childPid: null, createdAt: new Date().toISOString(), state: "running" };
+  await writeFile(join(leases, "live.json"), JSON.stringify(live));
+  await writeFile(join(leases, "stale-file.json"), JSON.stringify({ ...live, launcherPid: 2147483647, state: "exited" }));
+  await expect(clearStaleLeases(profile)).rejects.toMatchObject({ code: "INVALID_LEASE" });
+  expect(JSON.parse(await readFile(join(leases, "live.json"), "utf8"))).toEqual(live);
+});
+
+test("stale cleanup restores evidence changed after inspection", async () => {
+  const leases = join(profile.root, ".pi-profile-leases");
+  await mkdir(leases, { mode: 0o700 });
+  const path = join(leases, "stale.json");
+  const stale = { version: 1, id: "stale", hostname: hostname(), launcherPid: 2147483647, childPid: null, createdAt: new Date().toISOString(), state: "exited" };
+  const changed = { ...stale, launcherPid: process.pid, state: "running" };
+  await writeFile(path, JSON.stringify(stale));
+  await expect(clearStaleLeases(profile, { beforeRemove: async () => writeFile(path, JSON.stringify(changed)) })).rejects.toMatchObject({ code: "LEASE_CHANGED" });
+  expect(JSON.parse(await readFile(path, "utf8"))).toEqual(changed);
 });
 
 test("live child remains active even if launcher identity is absent", async () => {
