@@ -59,6 +59,31 @@ describe("ProfileStore", () => {
     await expect(store.get("work")).rejects.toThrow();
   });
 
+  test("reports committed rename cleanup failure with every recovery path and no data loss", async () => {
+    const profile = await store.create(metadata("work"));
+    await writeFile(join(profile.root, "settings.json"), "synthetic settings");
+    const failing = new ProfileStore({ profilesRoot, now, fault: (point) => {
+      if (point === "rename-after-promotion") throw new Error("injected rename cleanup failure");
+    } });
+    let failure: (Error & { code?: string }) | undefined;
+    try {
+      await failing.rename("work", "office");
+    } catch (error) {
+      failure = error as Error & { code?: string };
+    }
+    expect(failure?.code).toBe("RENAME_COMMITTED_CLEANUP_PENDING");
+    expect(failure?.message).toMatch(/committed/i);
+    const journalName = (await readdir(profilesRoot)).find((entry) => entry.startsWith(".pi-profile-journal-"));
+    expect(journalName).toBeTruthy();
+    const journalPath = join(profilesRoot, journalName!);
+    const journal = JSON.parse(await readFile(journalPath, "utf8"));
+    for (const candidate of [journal.source, journal.staging, journal.destination]) expect(failure?.message).toContain(candidate);
+    expect(await readFile(join(profilesRoot, "office", "settings.json"), "utf8")).toBe("synthetic settings");
+    await writeFile(journalPath, JSON.stringify({ ...journal, pid: 2147483647 })); // equivalent next-process state
+    await expect(store.recover()).resolves.toMatchObject({ transactionsRecovered: 1 });
+    expect(await readFile(join((await store.get("office")).root, "settings.json"), "utf8")).toBe("synthetic settings");
+  });
+
   test("blocks rename and removal while a launcher or child is live", async () => {
     const profile = await store.create(metadata("work"));
     const lease = await acquireLease(profile);

@@ -192,13 +192,24 @@ export class ProfileStore {
       const journal = transactionPath(this.profilesRoot, owner.id);
       const updated = { ...source.metadata, name: newName } satisfies ProfileMetadata;
       await atomicWriteJson(journal, { ...owner, operation: "rename", source: source.root, staging, destination, originalMetadata: source.metadata });
+      let committed = false;
       try {
         await rename(source.root, staging);
         await atomicWriteJson(join(staging, MARKER), updated);
         await this.fault?.("rename-before-promotion");
         await rename(staging, destination);
-        await rm(journal, { force: true });
+        committed = true;
+        try {
+          await this.fault?.("rename-after-promotion");
+          await rm(journal, { force: true });
+        } catch (error) {
+          throw new ProfileError(
+            "RENAME_COMMITTED_CLEANUP_PENDING",
+            `Rename committed at destination ${destination}, but journal cleanup is pending. Source candidate: ${source.root}; staging candidate: ${staging}; run pi-profile recover after this process exits (${(error as Error).message})`,
+          );
+        }
       } catch (error) {
+        if (committed) throw error;
         try {
           if (await pathKind(staging) === "directory") {
             await atomicWriteJson(join(staging, MARKER), source.metadata);
@@ -206,7 +217,7 @@ export class ProfileStore {
           }
           await rm(journal, { force: true });
         } catch {
-          throw new ProfileError("ROLLBACK_FAILED", `Rename recovery is required; data remains at ${source.root} or ${staging}`);
+          throw new ProfileError("ROLLBACK_FAILED", `Rename recovery is required. Source: ${source.root}; staging: ${staging}; destination: ${destination}`);
         }
         throw error;
       }
