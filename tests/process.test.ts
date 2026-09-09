@@ -134,17 +134,29 @@ test("supports concurrent same-profile launches with distinct leases", async () 
 
 describe("Pi resolution", () => {
   test.each([
-    ["global", (pathDirectory: string) => join(pathDirectory, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")],
-    ["local", (pathDirectory: string) => join(pathDirectory, "..", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")],
-  ] as const)("resolves a %s Windows npm shim without a shell", async (_layout, bundlePath) => {
+    ["global", (pathDirectory: string) => join(pathDirectory, "node_modules", "@earendil-works", "pi-coding-agent")],
+    ["local", (pathDirectory: string) => join(pathDirectory, "..", "@earendil-works", "pi-coding-agent")],
+  ] as const)("resolves a %s Windows npm shim from package bin metadata without a shell", async (_layout, packagePath) => {
     const pathDirectory = join(fixture, "node_modules", ".bin");
     const shim = join(pathDirectory, "pi.cmd");
-    const bundle = bundlePath(pathDirectory);
+    const packageRoot = packagePath(pathDirectory);
+    const bundle = join(packageRoot, "custom", "pi-entry.js");
     await mkdir(pathDirectory, { recursive: true });
     await mkdir(join(bundle, ".."), { recursive: true });
     await writeFile(shim, "@echo off\r\n");
+    await writeFile(join(packageRoot, "package.json"), JSON.stringify({ bin: { pi: "custom/pi-entry.js" } }));
     await writeFile(bundle, "// synthetic Pi entrypoint\n");
     await expect(resolvePi({ Path: pathDirectory }, "win32")).resolves.toEqual({ command: process.execPath, prefixArgs: [bundle] });
+  });
+
+  test("rejects an escaping Windows package bin target", async () => {
+    const pathDirectory = join(fixture, "bin");
+    const packageRoot = join(pathDirectory, "node_modules", "@earendil-works", "pi-coding-agent");
+    await mkdir(packageRoot, { recursive: true });
+    await writeFile(join(pathDirectory, "pi.cmd"), "@echo off\r\n");
+    await writeFile(join(packageRoot, "package.json"), JSON.stringify({ bin: { pi: "../../../../../outside.js" } }));
+    await writeFile(join(fixture, "outside.js"), "// must not execute\n");
+    await expect(resolvePi({ PATH: pathDirectory }, "win32")).rejects.toThrow(/unsupported Pi command wrapper/i);
   });
 
   test("finds an executable from PATH without a shell", async () => {

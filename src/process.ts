@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
-import { access } from "node:fs/promises";
-import { delimiter, join, resolve } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { LaunchRequest } from "./contracts.js";
@@ -24,6 +24,20 @@ async function executable(path: string, platform: NodeJS.Platform): Promise<bool
   }
 }
 
+async function packageBin(packageRoot: string, platform: NodeJS.Platform): Promise<string | undefined> {
+  try {
+    const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as { bin?: string | Record<string, string> };
+    const declared = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.pi;
+    if (typeof declared !== "string" || !declared) return undefined;
+    const candidate = resolve(packageRoot, declared);
+    const fromRoot = relative(packageRoot, candidate);
+    if (fromRoot.startsWith("..") || isAbsolute(fromRoot)) return undefined;
+    return await executable(candidate, platform) ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function resolvePi(
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
@@ -31,7 +45,7 @@ export async function resolvePi(
   const pathValue = platform === "win32"
     ? Object.entries(env).find(([name]) => name.toUpperCase() === "PATH")?.[1]
     : env.PATH;
-  const directories = (pathValue ?? "").split(delimiter).filter(Boolean);
+  const directories = (pathValue ?? "").split(platform === "win32" ? ";" : delimiter).filter(Boolean);
   let unsupportedWrapper: string | undefined;
   for (const directory of directories) {
     if (platform === "win32") {
@@ -39,14 +53,13 @@ export async function resolvePi(
       if (await executable(direct, platform)) return { command: direct, prefixArgs: [] };
       const commandShim = join(directory, "pi.cmd");
       if (await executable(commandShim, platform)) {
-        const bundles = [
-          // Global npm shim: <global-bin>/node_modules/@scope/package/...
-          join(directory, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"),
-          // Local npm shim: <project>/node_modules/.bin/pi.cmd
-          join(directory, "..", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"),
+        const packageRoots = [
+          join(directory, "node_modules", "@earendil-works", "pi-coding-agent"),
+          join(directory, "..", "@earendil-works", "pi-coding-agent"),
         ];
-        for (const bundle of bundles) {
-          if (await executable(bundle, platform)) return { command: process.execPath, prefixArgs: [bundle] };
+        for (const packageRoot of packageRoots) {
+          const bundle = await packageBin(packageRoot, platform);
+          if (bundle) return { command: process.execPath, prefixArgs: [bundle] };
         }
         unsupportedWrapper = commandShim;
       }
