@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { writeFileSync } from "node:fs";
 
+if (process.env.TEST_IGNORE_SIGTERM) process.on("SIGTERM", () => {});
+
 if (process.env.TEST_CAPTURE) {
   writeFileSync(process.env.TEST_CAPTURE, JSON.stringify({
+    pid: process.pid,
     argv: process.argv.slice(2),
     cwd: process.cwd(),
     profile: process.env.PI_PROFILE_NAME,

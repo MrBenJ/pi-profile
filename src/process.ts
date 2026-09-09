@@ -69,7 +69,7 @@ function sessionArguments(piArgs: string[]): string[] {
 export async function runPi(
   request: LaunchRequest,
   target: Executable,
-  options: { leaseFactory?: typeof acquireLease } = {},
+  options: { leaseFactory?: typeof acquireLease; publicationDrainMs?: number } = {},
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   await validateLaunch(request);
   const owner = await (options.leaseFactory ?? acquireLease)(request.profile);
@@ -93,7 +93,10 @@ export async function runPi(
   });
   // Attach rejection handling immediately. Publication can fail before the
   // normal `await outcome` path, while the child independently emits error.
-  const drainedOutcome = outcome.catch(() => undefined);
+  const settledOutcome = outcome.then(
+    (value) => ({ kind: "exit" as const, value }),
+    (error: unknown) => ({ kind: "error" as const, error }),
+  );
 
   const forwardedSignals: NodeJS.Signals[] = process.platform === "win32" ? ["SIGTERM"] : ["SIGTERM", "SIGHUP"];
   const handlers = new Map<NodeJS.Signals, () => void>();
@@ -122,10 +125,24 @@ export async function runPi(
     try {
       await owner.setChild(child.pid);
     } catch (error) {
+      try { child.kill("SIGTERM"); } catch { /* Settlement below decides whether evidence is retained. */ }
+      const drainMs = options.publicationDrainMs ?? 2_000;
+      const settlement = await new Promise<Awaited<typeof settledOutcome> | { kind: "timeout" }>((resolveSettlement) => {
+        const timer = setTimeout(() => resolveSettlement({ kind: "timeout" }), drainMs);
+        settledOutcome.then((value) => {
+          clearTimeout(timer);
+          resolveSettlement(value);
+        });
+      });
+      if (settlement.kind === "exit") {
+        throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; child exit was confirmed and this launcher's lease was released: ${(error as Error).message}`);
+      }
       retainLease = true;
-      try { child.kill("SIGTERM"); } catch { /* The outcome still drains an already-exited child. */ }
-      await drainedOutcome;
-      throw new ProfileError("LEASE_PUBLICATION_FAILED", `Pi started but its child lease could not be recorded; the child was reaped and the conservative lease was retained: ${(error as Error).message}`);
+      const leasePath = join(request.profile.root, ".pi-profile-leases", `${owner.lease.id}.json`);
+      throw new ProfileError(
+        "LEASE_PUBLICATION_UNCERTAIN",
+        `Pi started but its child lease could not be recorded and child exit could not be confirmed. Evidence was retained at ${leasePath}; verify child PID ${child.pid} is gone before manually removing that exact lease file: ${(error as Error).message}`,
+      );
     }
     return await outcome;
   } finally {

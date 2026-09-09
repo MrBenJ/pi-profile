@@ -81,15 +81,42 @@ test("SIGINT waits for a synthetic child and releases its lease", async () => {
   expect((await inspectLeases(profile)).active).toHaveLength(0);
 });
 
-test("drains a child after lease publication failure and retains the conservative lease", async () => {
+test("releases its own lease when publication fails and child exit is proven", async () => {
+  const leaseFactory = async (selected: Profile) => {
+    const lease = await acquireLease(selected);
+    return { ...lease, setChild: async () => { throw new Error("injected publication failure"); } };
+  };
+  await expect(runPi(request([], { TEST_WAIT_FOR_SIGNAL: "1" }), executable, { leaseFactory })).rejects.toThrow(/exit.*confirmed/i);
+  expect(await inspectLeases(profile)).toEqual({ active: [], ambiguous: [], stale: [] });
+});
+
+test("retains actionable lease evidence when publication failure child exit is unproven", async () => {
   let retained: Awaited<ReturnType<typeof acquireLease>> | undefined;
   const leaseFactory = async (selected: Profile) => {
     const lease = await acquireLease(selected);
     retained = lease;
-    return { ...lease, setChild: async () => { throw new Error("injected publication failure"); } };
+    return {
+      ...lease,
+      setChild: async () => {
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          try { await access(capture); break; } catch { await new Promise((resolve) => setTimeout(resolve, 5)); }
+        }
+        await access(capture);
+        throw new Error("injected publication failure");
+      },
+    };
   };
-  await expect(runPi(request([], { TEST_WAIT_FOR_SIGNAL: "1" }), executable, { leaseFactory })).rejects.toThrow(/lease.*recorded/i);
+  let failure: Error | undefined;
+  try {
+    await runPi(request([], { TEST_WAIT_FOR_SIGNAL: "1", TEST_IGNORE_SIGTERM: "1" }), executable, { leaseFactory, publicationDrainMs: 30 });
+  } catch (error) {
+    failure = error as Error;
+  }
+  expect(failure?.message).toMatch(/could not be confirmed.*manually remov/i);
+  expect(failure?.message).toContain(retained!.lease.id);
   expect((await inspectLeases(profile)).active).toHaveLength(1);
+  const child = JSON.parse(await readFile(capture, "utf8")) as { pid: number };
+  process.kill(child.pid, "SIGKILL");
   await retained?.release();
 });
 
