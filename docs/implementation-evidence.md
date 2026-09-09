@@ -84,6 +84,7 @@ The latest independent review verdict contains the findings above and predates t
 - Real `npm pack` plus isolated `npm install --legacy-peer-deps --ignore-scripts <tarball>`: PASS; executable, CLI, extension, README, and license resolved, and installed CLI created a profile under a temporary HOME.
 - Tarball exclusion check: PASS — no tests, `auth.json`, or `.worktrees` paths.
 - Round-two final smoke: PASS — fresh `npm pack --dry-run`; native Pi offline `auth`/`uninstall` help through the built launcher; tarball exclusion scan; isolated tarball install; packed CLI help/version/profile creation; and `git diff --check`.
+- Round-three final smoke: PASS — fresh `npm pack --dry-run`; native Pi 0.85.1 `--export=<file>` parser confirmation; native offline `auth`/`uninstall` through the built launcher; tarball exclusion scan; isolated install; packed help/version/profile creation; and `git diff --check`.
 - `git diff --check`: PASS.
 
 ## Not verified in this environment
