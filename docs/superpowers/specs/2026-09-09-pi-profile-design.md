@@ -1,7 +1,7 @@
 # Pi Profile Design
 
 **Date:** 2026-09-09
-**Status:** Approved in conversation; awaiting written-spec review
+**Status:** Approved for implementation; native shared-resource boundary clarified by user
 **Target package:** `pi-profile`
 **Target repository:** `/Users/bjunya/code/hbai/opensource/pi-customizations/pi-profile`
 
@@ -11,7 +11,9 @@
 
 The package exposes a `pi-profile` executable and a lightweight Pi extension. The executable selects and manages profiles, filters provider authentication variables, sets Pi's supported `PI_CODING_AGENT_DIR` override, and launches the normal Pi executable. The extension continuously displays the selected profile in Pi's footer and terminal title.
 
-Profiles share only installed program code: the Pi executable and the `pi-profile` package. Mutable Pi data remains profile-specific. The existing `~/.pi/agent` installation is never modified automatically.
+Profiles share installed program code: the Pi executable and the `pi-profile` package. Pi's default configuration/storage remains profile-specific. The existing `~/.pi/agent` installation is never modified automatically.
+
+**User-confirmed boundary:** Ambient `~/.agents/skills` is intentionally shared across the user's agents. Trusted project resources and native explicit session/resource path overrides retain normal Pi behavior, including `PI_CODING_AGENT_SESSION_DIR`. The launcher must not add skill exclusions, reject native session paths, or redirect cloud SDK home/config discovery. The environment denylist prevents known environment-key inheritance, not every SDK default-file credential lookup. Isolation claims in this document refer to profile-default Pi-managed data, not filesystem confinement or policy enforcement over intentional external paths.
 
 ## Goals
 
@@ -265,6 +267,8 @@ On `session_start`, including startup, reload, new session, resume, and fork, it
 - terminal title containing the profile name and current project context.
 
 It uses a namespaced status key and does not replace Pi's complete footer. It does not send messages, append session entries, alter model context, register tools, or manage authentication.
+
+A read-only `/profile` command shows the active profile name/root and explains how to launch another profile externally. It never switches profiles, accesses authentication files, or introduces an identity/permissions layer.
 
 In print and JSON modes, UI behavior is a safe no-op. RPC behavior uses only UI methods supported by that mode. The profile environment marker remains available to the Pi process regardless of UI mode.
 
