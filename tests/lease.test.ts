@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -22,6 +22,15 @@ test("lease records launcher and child and releases only itself", async () => {
   await first.release();
   expect((await inspectLeases(profile)).active).toHaveLength(1);
   await second.release();
+});
+
+test("release refuses to erase a changed lease record", async () => {
+  const owner = await acquireLease(profile);
+  const path = join(profile.root, ".pi-profile-leases", `${owner.lease.id}.json`);
+  const replacement = { ...owner.lease, childPid: process.pid, state: "running" };
+  await writeFile(path, JSON.stringify(replacement));
+  await expect(owner.release()).rejects.toMatchObject({ code: "LEASE_OWNERSHIP_LOST" });
+  expect(JSON.parse(await readFile(path, "utf8"))).toEqual(replacement);
 });
 
 test("live child remains active even if launcher identity is absent", async () => {

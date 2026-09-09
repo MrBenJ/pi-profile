@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import type { Lease, Profile } from "./contracts.js";
@@ -117,10 +117,32 @@ export async function acquireLease(profile: Profile): Promise<{
       },
       async release() {
         if (released) return;
-        released = true;
-        lease = { ...lease, state: "exited" };
-        await atomicWriteJson(path, lease).catch(() => undefined);
-        await rm(path, { force: true });
+        const quarantine = `${path}.release-${randomUUID()}`;
+        try {
+          await rename(path, quarantine);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            released = true;
+            return;
+          }
+          throw error;
+        }
+        try {
+          const current = parseLease(JSON.parse(await readFile(quarantine, "utf8")));
+          const unchanged = current.id === lease.id && current.hostname === lease.hostname &&
+            current.launcherPid === lease.launcherPid && current.childPid === lease.childPid &&
+            current.createdAt === lease.createdAt && current.state === lease.state;
+          if (!unchanged) throw new ProfileError("LEASE_OWNERSHIP_LOST", `Lease evidence changed; refusing to remove ${path}`);
+          await rm(quarantine);
+          released = true;
+        } catch (error) {
+          try {
+            await rename(quarantine, path);
+          } catch {
+            throw new ProfileError("LEASE_OWNERSHIP_LOST", `Lease evidence changed and remains quarantined at ${quarantine}`);
+          }
+          throw error;
+        }
       },
     };
   });
