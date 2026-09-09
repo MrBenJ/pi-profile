@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { writeFileSync } from "node:fs";
 
 if (process.env.TEST_CAPTURE) {

@@ -243,7 +243,7 @@ process.exit(Number(process.env.TEST_EXIT_CODE || 0));
 **Consumes:** Store, importer, environment/policy, process runner.
 **Produces:** `main(argv: string[], deps: CliDependencies): Promise<number>`; dependency object provides store, `runPi`, `inspectImport`, `importProfile`, `select`, `confirm`, `input`, cwd/env and output writers. Define the interface in cli.ts and use it in tests; production adapters are instantiated in bin entry.
 
-- [ ] Write table-driven tests for create/list/show/rename/remove/import/config, picker cancellation, missing args without a TTY and every documented scriptable flag. Confirm denied prompts invoke no mutation dependency.
+- [x] Write table-driven tests for create/list/show/rename/remove/import/config, picker cancellation, missing args without a TTY and every documented scriptable flag. Confirm denied prompts invoke no mutation dependency.
 
 ```ts
 expect(parseCli(["--cwd", "/repo", "work", "-p", "--", "- literal"])).toEqual({
@@ -251,11 +251,11 @@ expect(parseCli(["--cwd", "/repo", "work", "-p", "--", "- literal"])).toEqual({
 });
 ```
 
-- [ ] Define/export `parseCli(argv: string[]): CliCommand` in cli.ts; discriminated union includes launch and each management command, with exact command-specific fields. Flags before profile are launcher-only. Flags after profile in launch mode belong to Pi. Config subcommand flags are parsed only in management mode.
-- [ ] Run failing CLI tests, then implement dispatch. Prompt only with a terminal; report a missing explicit profile for bare noninteractive invocation. Typed removal confirmation must equal the exact slug; --force bypasses the prompt but never active-lease/path checks. Import uses --yes, never --force implying overwrite.
-- [ ] Configure default cwd as an absolute path; `--clear-default-cwd` resets null. Validate `--inherit` names, reject reserved routing variables, and persist metadata under store lock. `config --pi` invokes normal Pi config with selected environment/cwd; no parallel metadata edit while its lease is live.
-- [ ] Show only name/root/defaultCwd/allowlist names/lease diagnostics. Keep auth opaque. Errors go to stderr with stable nonzero codes. No matching command silently creates a profile.
-- [ ] Test actual built bin invocation against the fake Pi after compiling, not just dependency-injected dispatch. Run package checks and commit CLI.
+- [x] Define/export `parseCli(argv: string[]): CliCommand` in cli.ts; discriminated union includes launch and each management command, with exact command-specific fields. Flags before profile are launcher-only. Flags after profile in launch mode belong to Pi. Config subcommand flags are parsed only in management mode.
+- [x] Run failing CLI tests, then implement dispatch. Prompt only with a terminal; report a missing explicit profile for bare noninteractive invocation. Typed removal confirmation must equal the exact slug; --force bypasses the prompt but never active-lease/path checks. Import uses --yes, never --force implying overwrite.
+- [x] Configure default cwd as an absolute path; `--clear-default-cwd` resets null. Validate `--inherit` names, reject reserved routing variables, and persist metadata under store lock. `config --pi` invokes normal Pi config with selected environment/cwd; no parallel metadata edit while its lease is live.
+- [x] Show only name/root/defaultCwd/allowlist names/lease diagnostics. Keep auth opaque. Errors go to stderr with stable nonzero codes. No matching command silently creates a profile.
+- [x] Test actual built bin invocation against the fake Pi after compiling, not just dependency-injected dispatch. Run package checks and commit CLI.
 
 ## Task 7: Indicator and read-only profile command
 

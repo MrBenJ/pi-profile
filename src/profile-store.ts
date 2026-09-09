@@ -118,6 +118,10 @@ export class ProfileStore {
     if (parsed.name !== validateName(name)) throw new ProfileError("PROFILE_MISMATCH", "Updated metadata name must match the profile");
     await withMutationLock(this.profilesRoot, async () => {
       const profile = await this.get(name);
+      const leases = await inspectLeases(profile);
+      if (leases.active.length || leases.ambiguous.length) {
+        throw new ProfileError("PROFILE_ACTIVE", `Profile is active or its lifecycle cannot be checked safely: ${profile.metadata.name}`);
+      }
       await atomicWriteJson(join(profile.root, MARKER), parsed);
     });
   }
