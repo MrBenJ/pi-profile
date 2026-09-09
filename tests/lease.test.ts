@@ -45,7 +45,7 @@ test("rejects traversal lease IDs without touching an outside sentinel", async (
   await mkdir(join(outside, ".."), { recursive: true });
   await mkdir(leases, { mode: 0o700 });
   await writeFile(outside, "sentinel");
-  await writeFile(join(leases, "evil.json"), JSON.stringify({ version: 1, id: "../../../agent/auth", hostname: hostname(), launcherPid: 2147483647, childPid: null, createdAt: new Date().toISOString(), state: "exited" }));
+  await writeFile(join(leases, "evil.json"), JSON.stringify({ version: 1, id: "../../agent/auth", hostname: hostname(), launcherPid: 2147483647, childPid: null, createdAt: new Date().toISOString(), state: "exited" }));
   await expect(clearStaleLeases(profile)).rejects.toMatchObject({ code: "INVALID_LEASE" });
   expect(await readFile(outside, "utf8")).toBe("sentinel");
 });
