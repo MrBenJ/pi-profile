@@ -1,9 +1,10 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 
 export default defineConfig({
   test: {
     globalSetup: ["./tests/global-setup.ts"],
     environment: "node",
     coverage: { enabled: false },
+    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
   },
 });
