@@ -12,7 +12,9 @@ if (process.env.TEST_CAPTURE) {
     root: process.env.PI_CODING_AGENT_DIR,
     sessionDir: process.env.PI_CODING_AGENT_SESSION_DIR,
     openaiPresent: Object.hasOwn(process.env, "OPENAI_API_KEY"),
+    openaiValue: process.env.OPENAI_API_KEY,
     ordinary: process.env.TEST_ORDINARY,
+    profileOrdinary: process.env.PROFILE_ORDINARY,
   }));
 }
 if (process.env.TEST_WAIT_FOR_SIGNAL) {

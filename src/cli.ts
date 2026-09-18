@@ -4,6 +4,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import type { LaunchRequest, Profile } from "./contracts.js";
 import { ProfileError } from "./contracts.js";
 import { buildEnvironment, isReservedEnvironmentName } from "./environment.js";
+import { applyProfileEnvironment } from "./profile-environment.js";
 import { importProfile as copyProfile, inspectImport as inspectSource } from "./import.js";
 import { inspectLeases } from "./lease.js";
 import { selectWorkingDirectory } from "./launch-policy.js";
@@ -216,7 +217,8 @@ async function launchProfile(command: Extract<CliCommand, { command: "launch" }>
     throw error;
   }
   const cwd = await selectWorkingDirectory(profile, command.cwd ? expandPath(command.cwd, deps) : undefined, deps.cwd);
-  const result = await deps.runPi({ profile, piArgs: command.piArgs, cwd, env: buildEnvironment(profile, deps.env) });
+  const env = await applyProfileEnvironment(profile, buildEnvironment(profile, deps.env));
+  const result = await deps.runPi({ profile, piArgs: command.piArgs, cwd, env });
   return mappedExitStatus(result);
 }
 
@@ -344,7 +346,8 @@ async function dispatch(command: CliCommand, deps: CliDependencies): Promise<num
       if (operation.type === "pi") {
         const profile = await deps.store.get(name);
         const cwd = await selectWorkingDirectory(profile, undefined, deps.cwd);
-        const result = await deps.runPi({ profile, piArgs: ["config"], cwd, env: buildEnvironment(profile, deps.env) });
+        const env = await applyProfileEnvironment(profile, buildEnvironment(profile, deps.env));
+        const result = await deps.runPi({ profile, piArgs: ["config"], cwd, env });
         return mappedExitStatus(result);
       }
       if (operation.type === "inherit" || operation.type === "no-inherit") {

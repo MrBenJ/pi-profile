@@ -133,6 +133,29 @@ ZAI_CODING_CN_API_KEY
 
 `PI_CODING_AGENT_DIR` and `PI_PROFILE_NAME` are always replaced and cannot be allowlisted.
 
+## Profile-local environment file
+
+Each profile may carry an optional `~/.pi/profiles/<name>/.env`. When present, `pi-profile` loads it after the parent environment is filtered and before Pi is spawned, so Pi, extensions, MCP servers, shell tools, and child processes all receive the variables from startup — no wrapper script required.
+
+```bash
+umask 077
+cat > ~/.pi/profiles/dj-league/.env <<'EOF'
+DISCORD_STATUS_WEBHOOK_URL=replace-locally
+EOF
+chmod 600 ~/.pi/profiles/dj-league/.env
+
+pi-profile dj-league
+```
+
+- The file is **optional**; when it is absent the launch behaves exactly as before.
+- It is **profile-scoped**: only the selected profile's `.env` is read, resolved solely as `<profile root>/.env`. Arbitrary environment-file paths are not accepted.
+- Profile values **override inherited values** of the same name.
+- It is **parsed, never sourced** (via Node's `util.parseEnv`). It is not shell: `$(...)` command substitution, `${...}` expansion, and secret-manager commands are not executed — such text is passed through verbatim as an inert literal.
+- **Provider variables placed here do not require `config --inherit`.** The denylist above protects credentials inherited from the parent process; a profile-owned `.env` is an explicit, profile-level credential assignment. `PI_CODING_AGENT_DIR` and `PI_PROFILE_NAME` remain launcher-controlled and are rejected if the file declares them.
+- Insecure or malformed files **fail closed** — the launch stops with a clear error instead of continuing without the expected variables. The file is rejected when it is a symlink, is not a regular file, is not owned by the current user (where ownership can be checked), is group- or world-accessible (`mode & 0o077`), exceeds 64 KiB, cannot be parsed, or declares a launcher routing variable. Secure modes such as `0600` or `0400` are accepted; error messages name the path and reason but never the file's contents or variable values.
+
+Because it holds credentials, treat `.env` as sensitive profile data: **do not commit or share it.** Profile import/copy operations carry it as credential-bearing profile data (copied verbatim with private `0600` permissions), so an imported profile keeps its `.env`.
+
 ## Import and lifecycle safety
 
 Import is copy-based: the source is never the live profile and is never deleted. Files are copied as opaque bytes through hidden staging. Internal relative file and directory symlinks are preserved through publication and later rename; Windows uses true relative directory symlinks rather than staging-bound junctions and reports when Developer Mode or symlink privilege is required. Absolute, escaping, dangling, and special filesystem entries are rejected. Manager markers, journals, and leases are excluded. Absolute or home-relative external resource/session paths in settings are reported and preserved.

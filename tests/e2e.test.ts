@@ -74,3 +74,46 @@ test("built CLI keeps work and personal roots independent during concurrent laun
   expect(work.ordinary).toBe("preserved");
   expect(await readFile(unprofiled, "utf8")).toBe(before);
 });
+
+test("profile-local .env variables reach spawned Pi without weakening credential isolation", async () => {
+  await cli("create", "envwork");
+  const profileRoot = join(home, ".pi", "profiles", "envwork");
+  const dotenv = join(profileRoot, ".env");
+  await writeFile(dotenv, "PROFILE_ORDINARY=from-profile-env\nOPENAI_API_KEY=synthetic-profile-openai\n", { mode: 0o600 });
+  await chmod(dotenv, 0o600);
+
+  const capture = join(fixture, "envwork.json");
+  const result = await exec(process.execPath, [resolve(repository, "bin/pi-profile.js"), "envwork", "--", "prompt"], { cwd: fixture, env: { ...environment, TEST_CAPTURE: capture } });
+
+  const captured = JSON.parse(await readFile(capture, "utf8"));
+  expect(captured.profileOrdinary).toBe("from-profile-env");
+  expect(captured.openaiPresent).toBe(true);
+  // The parent's stripped OPENAI_API_KEY is replaced by the profile-owned value, without --inherit.
+  expect(captured.openaiValue).toBe("synthetic-profile-openai");
+  expect(captured.root).toBe(profileRoot);
+  expect(captured.profile).toBe("envwork");
+  expect(result.stdout).not.toContain("synthetic-profile-openai");
+  expect(result.stderr).not.toContain("synthetic-profile-openai");
+});
+
+test("an insecure profile .env fails the launch without leaking secret values", async () => {
+  await cli("create", "insecure");
+  const dotenv = join(home, ".pi", "profiles", "insecure", ".env");
+  await writeFile(dotenv, "OPENAI_API_KEY=synthetic-should-not-load\n", { mode: 0o644 });
+  await chmod(dotenv, 0o644);
+
+  const capture = join(fixture, "insecure.json");
+  let failure: (Error & { code?: number; stdout?: string; stderr?: string }) | undefined;
+  try {
+    await exec(process.execPath, [resolve(repository, "bin/pi-profile.js"), "insecure", "--", "prompt"], { cwd: fixture, env: { ...environment, TEST_CAPTURE: capture } });
+  } catch (error) {
+    failure = error as Error & { code?: number; stdout?: string; stderr?: string };
+  }
+  expect(failure).toBeDefined();
+  expect(failure?.code).not.toBe(0);
+  const combined = `${failure?.stdout ?? ""}${failure?.stderr ?? ""}`;
+  expect(combined).toContain(".env");
+  expect(combined).toMatch(/chmod 600|group|world|permission/i);
+  expect(combined).not.toContain("synthetic-should-not-load");
+  await expect(readFile(capture, "utf8")).rejects.toBeDefined();
+});
