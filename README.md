@@ -1,6 +1,12 @@
-# pi-profile
+# Pi Profile - A profile switcher for your pi harness
 
-*Isolated configuration profiles for the Pi coding agent — run work, personal, and client contexts on one machine without cross-contaminating credentials, settings, or sessions.*
+Installing an extension in your pi coding harness can alter its behavior. Plus, sometimes I want different harnesses for different use cases. This is a little extension I built so that I can have as many different customizable profiles with individual AI subscriptions per profile. 
+
+I run `pi-profile personal` for personal projects for a pi harness with my personal AI subs/API keys, extensions, and tools fit for my personal projects
+
+I run `pi-profile work` for my work account connected to work resources and work AI subs/API keys
+ 
+This way, I can keep my profiles separate and organized. Yay organization.
 
 `pi-profile` launches Pi with independent configuration roots for work, personal, or client contexts. It keeps Pi-managed credentials, settings, packages, extensions, skills, models, trust decisions, caches, and default sessions under `~/.pi/profiles/<name>` while leaving plain `pi` and `~/.pi/agent` unchanged.
 
