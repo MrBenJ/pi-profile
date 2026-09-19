@@ -1,5 +1,7 @@
 # pi-profile
 
+*Isolated configuration profiles for the Pi coding agent — run work, personal, and client contexts on one machine without cross-contaminating credentials, settings, or sessions.*
+
 `pi-profile` launches Pi with independent configuration roots for work, personal, or client contexts. It keeps Pi-managed credentials, settings, packages, extensions, skills, models, trust decisions, caches, and default sessions under `~/.pi/profiles/<name>` while leaving plain `pi` and `~/.pi/agent` unchanged.
 
 > This is configuration separation, not an operating-system sandbox. Pi and its tools retain normal access to the host filesystem, process environment, trusted project resources, explicit resource/session paths, and shared `~/.agents/skills`.
@@ -69,7 +71,7 @@ Consequently, explicit native paths can cross profile roots. Cloud SDKs may also
 
 Known provider authentication variables are removed unless their exact name is listed with `config --inherit`. Only names are stored; values continue to come from the parent process.
 
-Effective denylist in 0.1.0:
+Effective denylist in 1.0.0:
 
 ```text
 AI_GATEWAY_API_KEY
@@ -166,7 +168,7 @@ Profile discovery reports invalid visible roots (missing, malformed, unreadable,
 
 Mutation locks record a random owner id, hostname, PID, and creation time. Normal release verifies that exact owner before unlinking. A crash can leave a lock, journal, or import staging directory; the manager never silently steals it. After confirming the reported process exited, run `pi-profile recover`. Recovery clears only a same-host lock whose PID is provably absent and only transaction/staging paths whose owner metadata agrees. For rename journals, it deterministically restores a sole source or staging directory to the original profile, or verifies a sole committed destination before clearing the journal. Collisions, missing ownership markers, live PIDs, inaccessible PID state, other-host owners, malformed metadata, and paths outside the profile parent remain blocked and unchanged for manual inspection. Lock wait failures report the observed owner after a bounded five-second wait. A crash can also leave harmless `.pi-profile.lock.release-*` or atomic-write `.*.tmp` files. Recovery intentionally does not delete these owner-ambiguous artifacts; inspect and remove them manually only when provenance is certain. They do not block ordinary profile operations.
 
-Manager JSON writes use an owned temporary file plus atomic rename, which protects against ordinary process interruption. Version 0.1.0 does not fsync the file and parent directory and therefore does **not** promise recovery across sudden power loss, kernel failure, or storage-controller failure.
+Manager JSON writes use an owned temporary file plus atomic rename, which protects against ordinary process interruption. Version 1.0.0 does not fsync the file and parent directory and therefore does **not** promise recovery across sudden power loss, kernel failure, or storage-controller failure.
 
 The launcher handles Ctrl+C until Pi exits, then removes the session lease. In an interactive terminal it relies on the terminal's process-group SIGINT delivery instead of signaling Pi a second time. If publishing the child PID fails, a proven child exit allows the launcher to remove only its exact unchanged lease. If exit cannot be proven, the error names the retained lease file and child PID; verify that PID is gone before manually removing that exact file. Changed or potentially live lease evidence is never erased.
 
@@ -182,4 +184,8 @@ npm run verify
 npm pack --dry-run
 ```
 
-See [docs/manual-smoke.md](docs/manual-smoke.md) for credential and cross-platform checks. Tests always use temporary synthetic fixtures. The authorized 0.1.0 release target is macOS; Windows/Linux checks are advisory rather than release gates.
+See [docs/manual-smoke.md](docs/manual-smoke.md) for credential and cross-platform checks. Tests always use temporary synthetic fixtures. The authorized 1.0.0 release target is macOS; Windows/Linux checks are advisory rather than release gates.
+
+## License
+
+[MIT](LICENSE) © Ben Junya
