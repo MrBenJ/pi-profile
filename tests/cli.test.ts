@@ -84,7 +84,7 @@ test("help and version are usable without profiles", async () => {
   expect(stdout.join("\n")).toContain("--clear-stale-leases");
   stdout = [];
   expect(await main(["--version"], deps)).toBe(0);
-  expect(stdout).toEqual(["1.0.0"]);
+  expect(stdout).toEqual(["1.0.1"]);
 });
 
 test("create, list, show, and rename avoid secret-bearing contents", async () => {

@@ -1,10 +1,16 @@
 {
   "name": "pi-profile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Isolated configuration profiles for the Pi coding agent",
   "type": "module",
   "license": "MIT",
   "author": "Ben Junya",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrBenJ/pi-profile.git"
+  },
+  "homepage": "https://github.com/MrBenJ/pi-profile#readme",
+  "bugs": "https://github.com/MrBenJ/pi-profile/issues",
   "engines": {
     "node": ">=22.19.0"
   },
